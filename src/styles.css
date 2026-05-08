@@ -13,6 +13,46 @@ html, body {
   min-width: 120px;
 }
 
+.area-name-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.area-name-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+
+.area-name-input:focus {
+  border-color: #1b5e20;
+}
+
+.area-name-save {
+  padding: 5px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #1b5e20;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.area-name-save:hover {
+  background: #2e7d32;
+}
+
+.area-popup-sep {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 6px 0;
+}
+
 .area-type-btn {
   display: flex;
   align-items: center;
@@ -36,6 +76,22 @@ html, body {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.leaflet-tooltip.point-number {
+  background: #1b5e20;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 5px;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.leaflet-tooltip.point-number::before {
+  display: none;
 }
 
 .leaflet-tooltip.area-label {

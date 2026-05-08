@@ -1,6 +1,9 @@
 import { Component, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatIconModule } from '@angular/material/icon';
 import { LeafletModule } from '@bluehalo/ngx-leaflet';
 import { LeafletDrawModule } from '@bluehalo/ngx-leaflet-draw';
 import * as L from 'leaflet';
@@ -18,6 +21,7 @@ type AreaType = keyof typeof AREA_TYPES;
 
 interface SavedArea {
   id: string;
+  name?: string;
   type: AreaType;
   points: [number, number][];
 }
@@ -32,7 +36,7 @@ interface SavedView {
   selector: 'app-overview',
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
-  imports: [LeafletModule, LeafletDrawModule, MatButtonToggleModule, FormsModule],
+  imports: [LeafletModule, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, FormsModule, RouterLink],
 })
 export class OverviewComponent {
   readonly areaTypes = Object.entries(AREA_TYPES).map(([key, val]) => ({
@@ -46,6 +50,7 @@ export class OverviewComponent {
 
   private drawnItems!: L.FeatureGroup;
   private layerTypes = new Map<L.Layer, AreaType>();
+  private layerNames = new Map<L.Layer, string>();
 
   readonly baseLayers: Record<string, L.TileLayer> = {
     Streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -118,7 +123,7 @@ export class OverviewComponent {
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.on('draw:deleted', (e: any) => {
-      e.layers.eachLayer((layer: L.Layer) => this.layerTypes.delete(layer));
+      e.layers.eachLayer((layer: L.Layer) => { this.layerTypes.delete(layer); this.layerNames.delete(layer); });
       this.updateTotalArea();
       this.saveAreas();
     });
@@ -135,12 +140,11 @@ export class OverviewComponent {
   }
 
   private updateAreaLabel(layer: L.Polygon): void {
-    const text = this.formatArea(this.calculateArea(layer));
-    if (layer.getTooltip()) {
-      layer.setTooltipContent(text);
-    } else {
-      layer.bindTooltip(text, { permanent: true, direction: 'center', className: 'area-label' });
-    }
+    const name = this.layerNames.get(layer);
+    const area = this.formatArea(this.calculateArea(layer));
+    const text = name ? `<strong>${name}</strong><br>${area}` : area;
+    layer.unbindTooltip();
+    layer.bindTooltip(text, { permanent: true, direction: 'center', className: 'area-label' });
   }
 
   private updateTotalArea(): void {
@@ -166,6 +170,33 @@ export class OverviewComponent {
     const container = document.createElement('div');
     container.className = 'area-type-popup';
 
+    // Name row
+    const nameRow = document.createElement('div');
+    nameRow.className = 'area-name-row';
+    const nameInput = document.createElement('input');
+    nameInput.className = 'area-name-input';
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Name…';
+    nameInput.value = this.layerNames.get(layer) ?? '';
+    const nameBtn = document.createElement('button');
+    nameBtn.className = 'area-name-save';
+    nameBtn.textContent = '✓';
+    nameBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      if (name) { this.layerNames.set(layer, name); } else { this.layerNames.delete(layer); }
+      this.updateAreaLabel(layer);
+      layer.closePopup();
+      this.saveAreas();
+    });
+    nameRow.appendChild(nameInput);
+    nameRow.appendChild(nameBtn);
+    container.appendChild(nameRow);
+
+    const sep = document.createElement('hr');
+    sep.className = 'area-popup-sep';
+    container.appendChild(sep);
+
+    // Type buttons
     for (const { key, label, color } of this.areaTypes) {
       const btn = document.createElement('button');
       btn.className = 'area-type-btn';
@@ -181,6 +212,7 @@ export class OverviewComponent {
       this.setLayerType(layer, type);
       layer.closePopup();
       this.saveAreas();
+      this.updateTotalArea();
     });
 
     layer.bindPopup(container);
@@ -220,6 +252,7 @@ export class OverviewComponent {
         const type: AreaType = (area.type in AREA_TYPES) ? area.type : 'forest';
         const layer = L.polygon(area.points);
         this.setLayerType(layer, type);
+        if (area.name) this.layerNames.set(layer, area.name);
         this.bindTypePopup(layer);
         this.updateAreaLabel(layer);
         layer.addTo(this.drawnItems);
@@ -236,8 +269,10 @@ export class OverviewComponent {
       if (layer instanceof L.Polygon) {
         const ring = layer.getLatLngs()[0] as L.LatLng[];
         const type = this.layerTypes.get(layer) ?? 'forest';
+        const name = this.layerNames.get(layer);
         areas.push({
           id: crypto.randomUUID(),
+          ...(name ? { name } : {}),
           type,
           points: ring.map((ll) => [ll.lat, ll.lng]),
         });
