@@ -1,0 +1,65 @@
+<div class="map-container" leaflet [leafletOptions]="mapOptions" (leafletMapReady)="onMapReady($event)"></div>
+
+<div class="controls-panel">
+
+    @if (state === 'idle') {
+      <p class="hint">Walk to your area and start recording its boundary points.</p>
+      <div class="actions">
+        <button mat-raised-button color="primary" (click)="startRecording()">
+          <mat-icon>my_location</mat-icon>
+          Start Recording
+        </button>
+        <button mat-button (click)="cancel()">Cancel</button>
+      </div>
+    }
+
+    @if (state === 'recording') {
+      @if (locationError()) {
+        <p class="error">{{ locationError() }}</p>
+      }
+      <p class="point-count">
+        <mat-icon>place</mat-icon>
+        {{ points.length }} point{{ points.length !== 1 ? 's' : '' }} recorded
+      </p>
+      <div class="actions">
+        <button mat-fab color="primary" (click)="addPoint()" [disabled]="!currentLocation()" aria-label="Add point">
+          <mat-icon>add_location_alt</mat-icon>
+        </button>
+        <button mat-raised-button color="accent" (click)="finishRecording()" [disabled]="!canFinish">
+          Finish
+        </button>
+        <button mat-button (click)="cancel()">Cancel</button>
+      </div>
+      @if (!canFinish) {
+        <p class="hint">Add at least 3 points to finish.</p>
+      }
+    }
+
+    @if (state === 'completing') {
+      <mat-form-field appearance="outline" class="name-field">
+        <mat-label>Name (optional)</mat-label>
+        <input matInput [(ngModel)]="name" placeholder="e.g. North field">
+      </mat-form-field>
+
+      <mat-button-toggle-group [(ngModel)]="areaType" class="type-toggle">
+        @for (t of areaTypes; track t.key) {
+          <mat-button-toggle [value]="t.key">
+            <span class="type-dot" [style.background]="t.color"></span>
+            {{ t.label }}
+          </mat-button-toggle>
+        }
+      </mat-button-toggle-group>
+
+      <div class="actions">
+        <button mat-raised-button color="primary" (click)="save()">
+          <mat-icon>save</mat-icon>
+          Save
+        </button>
+        <button mat-button (click)="backToRecording()">
+          <mat-icon>arrow_back</mat-icon>
+          Back
+        </button>
+      </div>
+    }
+
+  </div>

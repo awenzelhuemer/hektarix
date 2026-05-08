@@ -1,11 +1,12 @@
 {
   "name": "hektarix",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --port 3000",
+    "start": "ng serve",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "deploy": "ng build --configuration production && firebase deploy --only hosting"
   },
   "private": true,
   "packageManager": "npm@11.14.0",
@@ -21,6 +22,7 @@
     "@bluehalo/ngx-leaflet": "^21.2.1",
     "@bluehalo/ngx-leaflet-draw": "^21.1.3",
     "@types/leaflet": "^1.9.21",
+    "firebase": "^12.13.0",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
     "rxjs": "~7.8.0",
