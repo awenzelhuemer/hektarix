@@ -1,0 +1,65 @@
+/* You can add global styles to this file, and also import other style files */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.area-type-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.area-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.area-type-btn:hover {
+  background: #f5f5f5;
+}
+
+.area-type-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.leaflet-tooltip.area-label {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 7px;
+  box-shadow: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.leaflet-tooltip.area-label::before {
+  display: none;
+}
+
+.leaflet-pane img,
+.leaflet-tile-container img {
+  max-width: none;
+  display: block;
+  box-sizing: content-box;
+  border: none;
+  padding: 0;
+}
