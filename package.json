@@ -5,8 +5,9 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
-    "deploy": "ng build --configuration production && firebase deploy --only hosting"
+    "deploy": "npm run build:prod && firebase deploy --only hosting"
   },
   "private": true,
   "packageManager": "npm@11.14.0",
