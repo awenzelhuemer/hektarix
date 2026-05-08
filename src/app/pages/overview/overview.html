@@ -1,0 +1,21 @@
+<div class="map-container" leaflet [leafletBaseLayers]="baseLayers" [leafletOptions]="mapOptions" (leafletMapReady)="onMapReady($event)">
+</div>
+
+@if (forestArea() > 0 || fieldArea() > 0) {
+  <div class="total-area">
+    @if (forestArea() > 0) {
+      <div class="total-area-row">
+        <span class="total-area-dot" style="background:#2d6a4f"></span>
+        <span class="total-area-label">Forest</span>
+        <span class="total-area-value">{{ formatArea(forestArea()) }}</span>
+      </div>
+    }
+    @if (fieldArea() > 0) {
+      <div class="total-area-row">
+        <span class="total-area-dot" style="background:#e9c46a"></span>
+        <span class="total-area-label">Field</span>
+        <span class="total-area-value">{{ formatArea(fieldArea()) }}</span>
+      </div>
+    }
+  </div>
+}
