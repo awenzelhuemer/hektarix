@@ -27,4 +27,9 @@ body {
   @include mat.fab-overrides((
     container-color: #fff
   ));
+
+  @include mat.toolbar-overrides((
+    container-background-color: #1b5e20,
+    container-text-color: #ffffff
+  ));
 }

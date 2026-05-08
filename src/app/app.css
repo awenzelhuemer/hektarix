@@ -3,8 +3,3 @@
   flex-direction: column;
   height: 100dvh;
 }
-
-mat-toolbar {
-  --mat-toolbar-container-background-color: #1b5e20;
-  --mat-toolbar-container-text-color: #ffffff;
-}
