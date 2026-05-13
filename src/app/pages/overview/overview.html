@@ -1,25 +1,89 @@
-<div class="map-container" leaflet [leafletBaseLayers]="baseLayers" [leafletOptions]="mapOptions" (leafletMapReady)="onMapReady($event)">
+<div class="overview-layout">
+  <section class="data-panel">
+    <div class="data-panel-header">
+      <div>
+        <h1>Kataster plots</h1>
+        <p class="hint">Add entries for Katastralgemeinde and Grundstücksnummer, then reload plot data to show it on the map.</p>
+      </div>
+      <div class="data-panel-actions">
+        <button mat-stroked-button color="primary" (click)="addEntry()">
+          <mat-icon>add</mat-icon>
+          Add entry
+        </button>
+        <button mat-flat-button color="accent" (click)="reloadEntries()" [disabled]="hasLoadingEntry">
+          <mat-icon>refresh</mat-icon>
+          Reload data
+        </button>
+      </div>
+    </div>
+
+    <div class="entry-list">
+      @for (entry of entries; track entry.id) {
+        <div class="entry-card">
+          <div class="entry-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Katastralgemeinde</mat-label>
+              <input matInput [(ngModel)]="entry.katastralgemeinde" (ngModelChange)="onEntryChanged(entry)" placeholder="e.g. 50100">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Grundstücksnummer</mat-label>
+              <input matInput [(ngModel)]="entry.grundstuecksnummer" (ngModelChange)="onEntryChanged(entry)" placeholder="e.g. 1234">
+            </mat-form-field>
+            <button mat-icon-button color="warn" aria-label="Remove entry" (click)="removeEntry(entry.id)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+          <div class="entry-status">
+            @if (entry.status === 'loading') {
+              <mat-icon>hourglass_top</mat-icon>
+              Loading plot data...
+            }
+            @if (entry.status === 'loaded') {
+              <mat-icon>check_circle</mat-icon>
+              Area: {{ formatArea(entry.area ?? 0) }}
+            }
+            @if (entry.status === 'error') {
+              <mat-icon>error</mat-icon>
+              <span class="error">{{ entry.message }}</span>
+            }
+            @if (entry.status === 'idle' && !entry.message) {
+              <mat-icon>edit</mat-icon>
+              Enter values and click Reload data.
+            }
+            @if (entry.status === 'idle' && entry.message) {
+              <mat-icon>warning</mat-icon>
+              <span>{{ entry.message }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="map-section">
+    <div class="map-container" leaflet [leafletBaseLayers]="baseLayers" [leafletOptions]="mapOptions" (leafletMapReady)="onMapReady($event)"></div>
+
+    @if (forestArea() > 0 || fieldArea() > 0) {
+      <div class="total-area">
+        @if (forestArea() > 0) {
+          <div class="total-area-row">
+            <span class="total-area-dot" style="background:#2d6a4f"></span>
+            <span class="total-area-label">Forest</span>
+            <span class="total-area-value">{{ formatArea(forestArea()) }}</span>
+          </div>
+        }
+        @if (fieldArea() > 0) {
+          <div class="total-area-row">
+            <span class="total-area-dot" style="background:#e9c46a"></span>
+            <span class="total-area-label">Field</span>
+            <span class="total-area-value">{{ formatArea(fieldArea()) }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    <button mat-fab class="record-btn" routerLink="/record" aria-label="Record new area">
+      <mat-icon>add_location_alt</mat-icon>
+    </button>
+  </section>
 </div>
-
-@if (forestArea() > 0 || fieldArea() > 0) {
-  <div class="total-area">
-    @if (forestArea() > 0) {
-      <div class="total-area-row">
-        <span class="total-area-dot" style="background:#2d6a4f"></span>
-        <span class="total-area-label">Forest</span>
-        <span class="total-area-value">{{ formatArea(forestArea()) }}</span>
-      </div>
-    }
-    @if (fieldArea() > 0) {
-      <div class="total-area-row">
-        <span class="total-area-dot" style="background:#e9c46a"></span>
-        <span class="total-area-label">Field</span>
-        <span class="total-area-value">{{ formatArea(fieldArea()) }}</span>
-      </div>
-    }
-  </div>
-}
-
-<button mat-fab class="record-btn" routerLink="/record" aria-label="Record new area">
-  <mat-icon>add_location_alt</mat-icon>
-</button>

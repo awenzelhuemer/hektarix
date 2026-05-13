@@ -53,7 +53,7 @@ export class RecordComponent implements OnDestroy {
   private currentMarker?: L.CircleMarker;
   private pointMarkers: L.CircleMarker[] = [];
 
-  get canFinish(): boolean { return this.points.length >= 3; }
+  get canFinish(): boolean { return this.points.length >= 5; }
 
   constructor(private router: Router) {}
 

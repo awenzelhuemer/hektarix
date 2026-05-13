@@ -1,16 +1,24 @@
 import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { LeafletModule } from '@bluehalo/ngx-leaflet';
 import { LeafletDrawModule } from '@bluehalo/ngx-leaflet-draw';
 import * as L from 'leaflet';
+import 'leaflet.vectorgrid';
+import { Api } from '../../api/api';
+import { gstKgnrGnrGet } from '../../api/functions';
+import type { GstResult } from '../../api/models/gst-result';
 
 const AREAS_KEY = 'hektarix-areas';
 const VIEW_KEY = 'hektarix-view';
 const LAYER_KEY = 'hektarix-layer';
+const ENTRIES_KEY = 'hektarix-plot-entries';
 
 const AREA_TYPES = {
   forest: { label: 'Forest', color: '#2d6a4f' },
@@ -18,6 +26,17 @@ const AREA_TYPES = {
 } as const;
 
 type AreaType = keyof typeof AREA_TYPES;
+
+type ParcelStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
+interface ParcelEntry {
+  id: string;
+  katastralgemeinde: string;
+  grundstuecksnummer: string;
+  status: ParcelStatus;
+  message?: string;
+  area?: number;
+}
 
 interface SavedArea {
   id: string;
@@ -36,7 +55,7 @@ interface SavedView {
   selector: 'app-overview',
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
-  imports: [LeafletModule, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, FormsModule, RouterLink],
+  imports: [LeafletModule, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, FormsModule, HttpClientModule, RouterLink],
 })
 export class OverviewComponent {
   readonly areaTypes = Object.entries(AREA_TYPES).map(([key, val]) => ({
@@ -44,13 +63,30 @@ export class OverviewComponent {
     ...val,
   }));
 
+  entries: ParcelEntry[] = [];
+
   visibleTypes: AreaType[] = ['forest', 'field'];
   forestArea = signal(0);
   fieldArea = signal(0);
 
   private drawnItems!: L.FeatureGroup;
+  private parcelGroup!: L.FeatureGroup;
+  private katasterVectorLayer?: L.Layer;
+  private parcelLayers = new Map<string, L.Layer>();
   private layerTypes = new Map<L.Layer, AreaType>();
   private layerNames = new Map<L.Layer, string>();
+
+  constructor(private api: Api) {
+    this.entries = this.loadParcelEntries();
+    if (!this.entries.length) {
+      this.entries.push({
+        id: crypto.randomUUID(),
+        katastralgemeinde: '',
+        grundstuecksnummer: '',
+        status: 'idle',
+      });
+    }
+  }
 
   readonly baseLayers: Record<string, L.TileLayer> = {
     Streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -85,9 +121,13 @@ export class OverviewComponent {
     this.restoreView(map);
     map.on('moveend', () => this.saveView(map));
 
+    this.parcelGroup = new L.FeatureGroup();
+    map.addLayer(this.parcelGroup); 
+
     this.drawnItems = new L.FeatureGroup();
     map.addLayer(this.drawnItems);
     this.loadAreas();
+    this.loadPlotEntries().catch(() => {});
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const drawControl = new (L as any).Control.Draw({
@@ -131,6 +171,142 @@ export class OverviewComponent {
 
   formatArea(m2: number): string {
     return `${(m2 / 10000).toFixed(4)} ha`;
+  }
+
+  get hasLoadingEntry(): boolean {
+    return this.entries.some((entry) => entry.status === 'loading');
+  }
+
+  addEntry(): void {
+    this.entries.push({
+      id: crypto.randomUUID(),
+      katastralgemeinde: '',
+      grundstuecksnummer: '',
+      status: 'idle',
+    });
+    this.saveParcelEntries();
+  }
+
+  removeEntry(id: string): void {
+    this.entries = this.entries.filter((entry) => entry.id !== id);
+    this.saveParcelEntries();
+    this.clearParcelLayer(id);
+  }
+
+  onEntryChanged(entry: ParcelEntry): void {
+    entry.status = 'idle';
+    entry.message = undefined;
+    entry.area = undefined;
+    this.saveParcelEntries();
+    this.clearParcelLayer(entry.id);
+  }
+
+  async reloadEntries(): Promise<void> {
+    await this.loadPlotEntries();
+  }
+
+  private loadParcelEntries(): ParcelEntry[] {
+    try {
+      const raw = localStorage.getItem(ENTRIES_KEY);
+      if (!raw) return [];
+      const entries = JSON.parse(raw) as Array<Pick<ParcelEntry, 'id' | 'katastralgemeinde' | 'grundstuecksnummer'>>;
+      return entries.map((entry) => ({
+        id: entry.id,
+        katastralgemeinde: entry.katastralgemeinde,
+        grundstuecksnummer: entry.grundstuecksnummer,
+        status: 'idle',
+      }));
+    } catch {
+      localStorage.removeItem(ENTRIES_KEY);
+      return [];
+    }
+  }
+
+  private saveParcelEntries(): void {
+    const entries = this.entries.map(({ id, katastralgemeinde, grundstuecksnummer }) => ({
+      id,
+      katastralgemeinde,
+      grundstuecksnummer,
+    }));
+    localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
+  }
+
+  private clearParcelLayer(id: string): void {
+    const layer = this.parcelLayers.get(id);
+    if (!layer) return;
+    layer.remove();
+    this.parcelLayers.delete(id);
+  }
+
+  private clearParcelLayers(): void {
+    this.parcelLayers.forEach((layer) => layer.remove());
+    this.parcelLayers.clear();
+  }
+
+  private async loadPlotEntries(): Promise<void> {
+    this.clearParcelLayers();
+    for (const entry of this.entries) {
+      entry.status = 'idle';
+      entry.message = undefined;
+      entry.area = undefined;
+      if (!entry.katastralgemeinde || !entry.grundstuecksnummer) {
+        entry.status = 'idle';
+        entry.message = 'Enter both values to load plot data';
+        continue;
+      }
+      await this.loadPlotEntry(entry);
+    }
+  }
+
+  private async loadPlotEntry(entry: ParcelEntry): Promise<void> {
+    entry.status = 'loading';
+    entry.message = undefined;
+    this.saveParcelEntries();
+
+    const kgnr = entry.katastralgemeinde.trim();
+    const gnr = entry.grundstuecksnummer.trim();
+    if (!kgnr || !gnr) {
+      entry.status = 'error';
+      entry.message = 'Katastralgemeinde and Grundstücksnummer must not be empty';
+      return;
+    }
+
+    try {
+      const result = await this.api.invoke<any, GstResult>(gstKgnrGnrGet as any, { kgnr, gnr } as any);
+      if (!result || typeof result !== 'object' || !('geometry' in result)) {
+        throw new Error('No geometry returned from Kätaster API');
+      }
+
+      const layer = L.geoJSON(result as any, {
+        style: {
+          color: '#d32f2f',
+          weight: 2,
+          fillColor: '#ef9a9a',
+          fillOpacity: 0.35,
+        },
+        onEachFeature: (feature, layer) => {
+          console.log(feature.geometry);
+          if (layer instanceof L.Polygon) {
+            const area = this.calculateArea(layer);
+            entry.area = area;
+            const label = `<strong>${entry.katastralgemeinde}/${entry.grundstuecksnummer}</strong><br>${this.formatArea(area)}`;
+            layer.bindTooltip(label, { permanent: true, direction: 'center', className: 'plot-label' });
+          }
+        },
+      });
+
+      if (!this.parcelGroup) {
+        this.parcelGroup = new L.FeatureGroup();
+      }
+      this.parcelGroup.addLayer(layer);
+      this.parcelLayers.set(entry.id, layer);
+      entry.status = 'loaded';
+      entry.message = undefined;
+    } catch (error) {
+      entry.status = 'error';
+      entry.message = error instanceof Error ? error.message : 'Failed to load plot data';
+      this.clearParcelLayer(entry.id);
+    }
   }
 
   private calculateArea(layer: L.Polygon): number {

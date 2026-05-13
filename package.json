@@ -7,7 +7,8 @@
     "build": "ng build",
     "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
-    "deploy": "npm run build:prod && firebase deploy --only hosting"
+    "deploy": "npm run build:prod && firebase deploy --only hosting",
+    "gen-api": "ng-openapi-gen --input https://kataster.bev.gv.at/at.gv.bev.kataster/api/swagger.yml --output ./src/app/api"
   },
   "private": true,
   "packageManager": "npm@11.14.0",
@@ -26,6 +27,8 @@
     "firebase": "^12.13.0",
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
+    "leaflet.vectorgrid": "^1.3.0",
+    "ng-openapi-gen": "^1.0.5",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
