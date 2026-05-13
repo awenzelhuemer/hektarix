@@ -1,4 +1,4 @@
-import { Component, OnDestroy, signal } from '@angular/core';
+import { Component, inject, OnDestroy, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,24 +6,18 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { LeafletModule } from '@bluehalo/ngx-leaflet';
 import * as L from 'leaflet';
+import { MapComponent } from '../../shared/map/map.component';
+import { AREA_TYPES, AREAS_KEY, AreaType } from '../../shared/area';
+import { GeolocationService } from '../../shared/geolocation.service';
 
-const AREAS_KEY = 'hektarix-areas';
-
-const AREA_TYPES = {
-  forest: { label: 'Forest', color: '#2d6a4f' },
-  field:  { label: 'Field',  color: '#e9c46a' },
-} as const;
-
-type AreaType = keyof typeof AREA_TYPES;
 type RecordState = 'idle' | 'recording' | 'completing';
 
 @Component({
   selector: 'app-record',
   templateUrl: './record.html',
   styleUrl: './record.scss',
-  imports: [LeafletModule, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatButtonToggleModule],
+  imports: [MapComponent, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatButtonToggleModule],
 })
 export class RecordComponent implements OnDestroy {
   state: RecordState = 'idle';
@@ -39,12 +33,6 @@ export class RecordComponent implements OnDestroy {
   readonly mapOptions: L.MapOptions = {
     zoom: 15,
     center: L.latLng(48.31, 14.29),
-    layers: [
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri',
-        maxZoom: 19,
-      }),
-    ],
   };
 
   private map?: L.Map;
@@ -55,15 +43,17 @@ export class RecordComponent implements OnDestroy {
 
   get canFinish(): boolean { return this.points.length >= 3; }
 
+  private readonly geo = inject(GeolocationService);
   constructor(private router: Router) {}
 
   onMapReady(map: L.Map): void {
     this.map = map;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => this.map?.setView([pos.coords.latitude, pos.coords.longitude], 17),
-      () => {},
-      { enableHighAccuracy: true },
-    );
+    this.geo.getCurrentPosition().then((pos) => map.setView(pos, 17)).catch(() => {});
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      if (this.state === 'recording') {
+        this.addPointAt([e.latlng.lat, e.latlng.lng]);
+      }
+    });
   }
 
   startRecording(): void {
@@ -75,7 +65,12 @@ export class RecordComponent implements OnDestroy {
 
   addPoint(): void {
     const loc = this.currentLocation();
-    if (!loc || !this.map) return;
+    if (!loc) return;
+    this.addPointAt(loc);
+  }
+
+  private addPointAt(loc: [number, number]): void {
+    if (!this.map) return;
 
     this.points.push(loc);
 
@@ -95,6 +90,18 @@ export class RecordComponent implements OnDestroy {
         weight: 2,
         dashArray: '6, 4',
       }).addTo(this.map);
+    }
+  }
+
+  removeLastPoint(): void {
+    if (!this.points.length) return;
+    this.points.pop();
+    this.pointMarkers.pop()?.remove();
+    if (this.points.length < 2) {
+      this.polygonLayer?.remove();
+      this.polygonLayer = undefined;
+    } else {
+      this.polygonLayer?.setLatLngs(this.points);
     }
   }
 
@@ -129,11 +136,10 @@ export class RecordComponent implements OnDestroy {
 
   private beginWatch(): void {
     this.locationError.set(null);
-    if (this.watchId !== undefined) navigator.geolocation.clearWatch(this.watchId);
+    if (this.watchId !== undefined) this.geo.clearWatch(this.watchId);
 
-    this.watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const ll: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+    this.watchId = this.geo.watch(
+      (ll) => {
         this.currentLocation.set(ll);
         if (!this.map) return;
         if (this.currentMarker) {
@@ -145,14 +151,13 @@ export class RecordComponent implements OnDestroy {
         }
         this.map.setView(ll, this.map.getZoom());
       },
-      (err) => this.locationError.set(err.message),
-      { enableHighAccuracy: true, maximumAge: 3000 },
+      (err) => this.locationError.set(err),
     );
   }
 
   private stopWatch(): void {
     if (this.watchId !== undefined) {
-      navigator.geolocation.clearWatch(this.watchId);
+      this.geo.clearWatch(this.watchId);
       this.watchId = undefined;
     }
   }

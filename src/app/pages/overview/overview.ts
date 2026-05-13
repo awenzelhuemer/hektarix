@@ -4,39 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { LeafletModule } from '@bluehalo/ngx-leaflet';
 import { LeafletDrawModule } from '@bluehalo/ngx-leaflet-draw';
 import * as L from 'leaflet';
-
-const AREAS_KEY = 'hektarix-areas';
-const VIEW_KEY = 'hektarix-view';
-const LAYER_KEY = 'hektarix-layer';
-
-const AREA_TYPES = {
-  forest: { label: 'Forest', color: '#2d6a4f' },
-  field:  { label: 'Field',  color: '#e9c46a' },
-} as const;
-
-type AreaType = keyof typeof AREA_TYPES;
-
-interface SavedArea {
-  id: string;
-  name?: string;
-  type: AreaType;
-  points: [number, number][];
-}
-
-interface SavedView {
-  lat: number;
-  lng: number;
-  zoom: number;
-}
+import { MapComponent } from '../../shared/map/map.component';
+import { AREA_TYPES, AREAS_KEY, AreaType, SavedArea } from '../../shared/area';
 
 @Component({
   selector: 'app-overview',
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
-  imports: [LeafletModule, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, FormsModule, RouterLink],
+  imports: [MapComponent, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, FormsModule, RouterLink],
 })
 export class OverviewComponent {
   readonly areaTypes = Object.entries(AREA_TYPES).map(([key, val]) => ({
@@ -52,39 +29,12 @@ export class OverviewComponent {
   private layerTypes = new Map<L.Layer, AreaType>();
   private layerNames = new Map<L.Layer, string>();
 
-  readonly baseLayers: Record<string, L.TileLayer> = {
-    Streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }),
-    Satellite: L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {
-        attribution:
-          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 19,
-      },
-    ),
-    Topographic: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      attribution:
-        'Map data: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
-      maxZoom: 17,
-    }),
-  };
-
   readonly mapOptions: L.MapOptions = {
     zoom: 8,
     center: L.latLng(47.5, 14.5),
   };
 
   onMapReady(map: L.Map): void {
-    const savedLayerName = localStorage.getItem(LAYER_KEY) ?? 'Streets';
-    (this.baseLayers[savedLayerName] ?? this.baseLayers['Streets']).addTo(map);
-    map.on('baselayerchange', (e: L.LayersControlEvent) => localStorage.setItem(LAYER_KEY, e.name));
-
-    this.restoreView(map);
-    map.on('moveend', () => this.saveView(map));
-
     this.drawnItems = new L.FeatureGroup();
     map.addLayer(this.drawnItems);
     this.loadAreas();
@@ -170,7 +120,6 @@ export class OverviewComponent {
     const container = document.createElement('div');
     container.className = 'area-type-popup';
 
-    // Name row
     const nameRow = document.createElement('div');
     nameRow.className = 'area-name-row';
     const nameInput = document.createElement('input');
@@ -196,7 +145,6 @@ export class OverviewComponent {
     sep.className = 'area-popup-sep';
     container.appendChild(sep);
 
-    // Type buttons
     for (const { key, label, color } of this.areaTypes) {
       const btn = document.createElement('button');
       btn.className = 'area-type-btn';
@@ -221,26 +169,6 @@ export class OverviewComponent {
   private styleFor(type: AreaType): L.PathOptions {
     const { color } = AREA_TYPES[type];
     return { color, fillColor: color, fillOpacity: 0.35, weight: 2, stroke: true, opacity: 1 };
-  }
-
-  private restoreView(map: L.Map): void {
-    const raw = localStorage.getItem(VIEW_KEY);
-    if (raw) {
-      try {
-        const { lat, lng, zoom }: SavedView = JSON.parse(raw);
-        map.setView([lat, lng], zoom);
-        return;
-      } catch {
-        localStorage.removeItem(VIEW_KEY);
-      }
-    }
-    map.locate({ setView: true, maxZoom: 13 });
-    map.on('locationerror', () => map.setView([47.5, 14.5], 8));
-  }
-
-  private saveView(map: L.Map): void {
-    const { lat, lng } = map.getCenter();
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ lat, lng, zoom: map.getZoom() }));
   }
 
   private loadAreas(): void {
