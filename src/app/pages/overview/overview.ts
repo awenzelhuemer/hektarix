@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,7 +7,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { LeafletDrawModule } from '@bluehalo/ngx-leaflet-draw';
 import * as L from 'leaflet';
 import { MapComponent } from '../../shared/map/map.component';
-import { AREA_TYPES, AREAS_KEY, AreaType, SavedArea } from '../../shared/area';
+import { AREA_TYPES, AreaType, SavedArea } from '../../shared/area';
+import { AreaService } from '../../shared/area.service';
 
 @Component({
   selector: 'app-overview',
@@ -25,6 +26,7 @@ export class OverviewComponent {
   forestArea = signal(0);
   fieldArea = signal(0);
 
+  private readonly areaService = inject(AreaService);
   private drawnItems!: L.FeatureGroup;
   private layerTypes = new Map<L.Layer, AreaType>();
   private layerNames = new Map<L.Layer, string>();
@@ -172,10 +174,7 @@ export class OverviewComponent {
   }
 
   private loadAreas(): void {
-    try {
-      const raw = localStorage.getItem(AREAS_KEY);
-      if (!raw) return;
-      const areas: SavedArea[] = JSON.parse(raw);
+    this.areaService.loadAreas().then((areas) => {
       for (const area of areas) {
         const type: AreaType = (area.type in AREA_TYPES) ? area.type : 'forest';
         const layer = L.polygon(area.points);
@@ -186,9 +185,7 @@ export class OverviewComponent {
         layer.addTo(this.drawnItems);
       }
       this.updateTotalArea();
-    } catch {
-      localStorage.removeItem(AREAS_KEY);
-    }
+    });
   }
 
   private saveAreas(): void {
@@ -206,6 +203,6 @@ export class OverviewComponent {
         });
       }
     });
-    localStorage.setItem(AREAS_KEY, JSON.stringify(areas));
+    this.areaService.saveAll(areas);
   }
 }

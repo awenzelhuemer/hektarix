@@ -1,5 +1,3 @@
-export const AREAS_KEY = 'hektarix-areas';
-
 export const AREA_TYPES = {
   forest: { label: 'Forest', color: '#2d6a4f' },
   field:  { label: 'Field',  color: '#e9c46a' },

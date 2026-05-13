@@ -8,8 +8,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import * as L from 'leaflet';
 import { MapComponent } from '../../shared/map/map.component';
-import { AREA_TYPES, AREAS_KEY, AreaType } from '../../shared/area';
+import { AREA_TYPES, AreaType } from '../../shared/area';
 import { GeolocationService } from '../../shared/geolocation.service';
+import { AreaService } from '../../shared/area.service';
 
 type RecordState = 'idle' | 'recording' | 'completing';
 
@@ -44,6 +45,7 @@ export class RecordComponent implements OnDestroy {
   get canFinish(): boolean { return this.points.length >= 3; }
 
   private readonly geo = inject(GeolocationService);
+  private readonly areaService = inject(AreaService);
   constructor(private router: Router) {}
 
   onMapReady(map: L.Map): void {
@@ -116,16 +118,14 @@ export class RecordComponent implements OnDestroy {
     this.beginWatch();
   }
 
-  save(): void {
+  async save(): Promise<void> {
     if (this.points.length < 3) return;
-    const areas = JSON.parse(localStorage.getItem(AREAS_KEY) ?? '[]');
-    areas.push({
+    await this.areaService.saveArea({
       id: crypto.randomUUID(),
       name: this.name.trim() || undefined,
       type: this.areaType,
       points: this.points,
     });
-    localStorage.setItem(AREAS_KEY, JSON.stringify(areas));
     this.router.navigate(['/']);
   }
 
