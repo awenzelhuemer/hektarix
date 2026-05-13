@@ -149,7 +149,6 @@ export class RecordComponent implements OnDestroy {
             radius: 10, color: '#1565c0', fillColor: '#42a5f5', fillOpacity: 0.9, weight: 2,
           }).addTo(this.map);
         }
-        this.map.setView(ll, this.map.getZoom());
       },
       (err) => this.locationError.set(err),
     );
