@@ -25,7 +25,8 @@ body {
 
 :root {
   @include mat.fab-overrides((
-    container-color: #fff
+    container-color: #fff,
+    small-container-color: #fff
   ));
 
   @include mat.toolbar-overrides((

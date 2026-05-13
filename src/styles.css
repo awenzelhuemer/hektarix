@@ -111,6 +111,11 @@ html, body {
   display: none;
 }
 
+/* Extra gap between projected page controls and the base map controls */
+.map-ctrl-sep {
+  height: 4px;
+}
+
 .leaflet-pane img,
 .leaflet-tile-container img {
   max-width: none;
