@@ -1,4 +1,4 @@
-<div class="map-container" leaflet [leafletOptions]="mapOptions" (leafletMapReady)="onMapReady($event)"></div>
+<app-map class="map-container" [mapOptions]="mapOptions" (mapReady)="onMapReady($event)"></app-map>
 
 <div class="controls-panel">
 
@@ -24,6 +24,9 @@
       <div class="actions">
         <button mat-fab color="primary" (click)="addPoint()" [disabled]="!currentLocation()" aria-label="Add point">
           <mat-icon>add_location_alt</mat-icon>
+        </button>
+        <button mat-icon-button (click)="removeLastPoint()" [disabled]="!points.length" aria-label="Remove last point">
+          <mat-icon>undo</mat-icon>
         </button>
         <button mat-raised-button color="accent" (click)="finishRecording()" [disabled]="!canFinish">
           Finish
