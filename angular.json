@@ -24,10 +24,12 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/material-theme.scss",
-            "src/styles.css",
-            "node_modules/leaflet/dist/leaflet.css",
-            "node_modules/leaflet-draw/dist/leaflet.draw.css"]
+            "styles": [
+              "src/material-theme.scss",
+              "src/styles.css",
+              "node_modules/leaflet/dist/leaflet.css",
+              "node_modules/leaflet-draw/dist/leaflet.draw.css"
+            ]
           },
           "configurations": {
             "production": {
@@ -43,7 +45,8 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "serviceWorker": "ngsw-config.json"
             },
             "development": {
               "optimization": false,
