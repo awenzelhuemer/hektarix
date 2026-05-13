@@ -3,13 +3,13 @@
 <div class="controls-panel">
 
     @if (state === 'idle') {
-      <p class="hint">Walk to your area and start recording its boundary points.</p>
+      <p class="hint">Gehe zu deiner Fläche und starte die Aufnahme der Grenzpunkte.</p>
       <div class="actions">
         <button mat-raised-button color="primary" (click)="startRecording()">
           <mat-icon>my_location</mat-icon>
-          Start Recording
+          Aufnahme starten
         </button>
-        <button mat-button (click)="cancel()">Cancel</button>
+        <button mat-button (click)="cancel()">Abbrechen</button>
       </div>
     }
 
@@ -19,29 +19,29 @@
       }
       <p class="point-count">
         <mat-icon>place</mat-icon>
-        {{ points.length }} point{{ points.length !== 1 ? 's' : '' }} recorded
+        {{ points.length }} Punkt{{ points.length !== 1 ? 'e' : '' }} aufgenommen
       </p>
       <div class="actions">
-        <button mat-fab color="primary" (click)="addPoint()" [disabled]="!currentLocation()" aria-label="Add point">
+        <button mat-fab color="primary" (click)="addPoint()" [disabled]="!currentLocation()" aria-label="Punkt hinzufügen">
           <mat-icon>add_location_alt</mat-icon>
         </button>
-        <button mat-icon-button (click)="removeLastPoint()" [disabled]="!points.length" aria-label="Remove last point">
+        <button mat-icon-button (click)="removeLastPoint()" [disabled]="!points.length" aria-label="Letzten Punkt entfernen">
           <mat-icon>undo</mat-icon>
         </button>
         <button mat-raised-button color="accent" (click)="finishRecording()" [disabled]="!canFinish">
-          Finish
+          Fertigstellen
         </button>
-        <button mat-button (click)="cancel()">Cancel</button>
+        <button mat-button (click)="cancel()">Abbrechen</button>
       </div>
       @if (!canFinish) {
-        <p class="hint">Add at least 3 points to finish.</p>
+        <p class="hint">Füge mindestens 3 Punkte hinzu, um fortzufahren.</p>
       }
     }
 
     @if (state === 'completing') {
       <mat-form-field appearance="outline" class="name-field">
         <mat-label>Name (optional)</mat-label>
-        <input matInput [(ngModel)]="name" placeholder="e.g. North field">
+        <input matInput [(ngModel)]="name" placeholder="z. B. Nordfeld">
       </mat-form-field>
 
       <mat-button-toggle-group [(ngModel)]="areaType" class="type-toggle">
@@ -56,11 +56,11 @@
       <div class="actions">
         <button mat-raised-button color="primary" (click)="save()">
           <mat-icon>save</mat-icon>
-          Save
+          Speichern
         </button>
         <button mat-button (click)="backToRecording()">
           <mat-icon>arrow_back</mat-icon>
-          Back
+          Zurück
         </button>
       </div>
     }

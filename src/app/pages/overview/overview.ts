@@ -127,7 +127,7 @@ export class OverviewComponent {
     const nameInput = document.createElement('input');
     nameInput.className = 'area-name-input';
     nameInput.type = 'text';
-    nameInput.placeholder = 'Name…';
+    nameInput.placeholder = 'Name …';
     nameInput.value = this.layerNames.get(layer) ?? '';
     const nameBtn = document.createElement('button');
     nameBtn.className = 'area-name-save';

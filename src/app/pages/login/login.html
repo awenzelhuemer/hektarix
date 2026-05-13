@@ -1,0 +1,11 @@
+<div class="login-container">
+  <h1 class="login-title">Hektarix</h1>
+  <p class="login-subtitle">Verwalte deine Felder und Wälder</p>
+  <button mat-raised-button color="primary" (click)="signIn()">
+    <mat-icon>login</mat-icon>
+    Mit Google anmelden
+  </button>
+  @if (error) {
+    <p class="login-error">{{ error }}</p>
+  }
+</div>
