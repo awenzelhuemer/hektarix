@@ -9,6 +9,7 @@ import {
   writeBatch,
 } from '@angular/fire/firestore';
 import { SavedArea, AreaType } from './area';
+import { AuthService } from './auth.service';
 
 interface StoredArea {
   id: string;
@@ -28,25 +29,38 @@ function fromStored(data: StoredArea): SavedArea {
 @Injectable({ providedIn: 'root' })
 export class AreaService {
   private readonly firestore = inject(Firestore);
+  private readonly auth = inject(AuthService);
+
+  private get col() {
+    const uid = this.auth.uid;
+    if (!uid) throw new Error('Nicht angemeldet');
+    return collection(this.firestore, `users/${uid}/areas`);
+  }
+
+  private areaDoc(id: string) {
+    const uid = this.auth.uid;
+    if (!uid) throw new Error('Nicht angemeldet');
+    return doc(this.firestore, `users/${uid}/areas/${id}`);
+  }
 
   async loadAreas(): Promise<SavedArea[]> {
-    const snap = await getDocs(collection(this.firestore, 'areas'));
+    const snap = await getDocs(this.col);
     return snap.docs.map((d) => fromStored(d.data() as StoredArea));
   }
 
   async saveArea(area: SavedArea): Promise<void> {
-    await setDoc(doc(this.firestore, 'areas', area.id), toStored(area));
+    await setDoc(this.areaDoc(area.id), toStored(area));
   }
 
   async deleteArea(id: string): Promise<void> {
-    await deleteDoc(doc(this.firestore, 'areas', id));
+    await deleteDoc(this.areaDoc(id));
   }
 
   async saveAll(areas: SavedArea[]): Promise<void> {
-    const snap = await getDocs(collection(this.firestore, 'areas'));
+    const snap = await getDocs(this.col);
     const batch = writeBatch(this.firestore);
     snap.docs.forEach((d) => batch.delete(d.ref));
-    areas.forEach((area) => batch.set(doc(this.firestore, 'areas', area.id), toStored(area)));
+    areas.forEach((area) => batch.set(this.areaDoc(area.id), toStored(area)));
     await batch.commit();
   }
 }

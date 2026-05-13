@@ -1,2 +1,13 @@
-<mat-toolbar>Hektarix</mat-toolbar>
+<mat-toolbar>
+  <span>Hektarix</span>
+  <span class="toolbar-spacer"></span>
+  @if (authService.user(); as user) {
+    @if (user.photoURL) {
+      <img [src]="user.photoURL" class="toolbar-avatar" [alt]="user.displayName ?? ''">
+    }
+    <button mat-icon-button (click)="signOut()" aria-label="Abmelden" class="toolbar-btn">
+      <mat-icon>logout</mat-icon>
+    </button>
+  }
+</mat-toolbar>
 <router-outlet />

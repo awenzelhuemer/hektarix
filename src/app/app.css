@@ -3,3 +3,19 @@
   flex-direction: column;
   height: 100dvh;
 }
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 8px;
+  object-fit: cover;
+}
+
+.toolbar-btn {
+  color: white;
+}

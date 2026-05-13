@@ -3,6 +3,29 @@
   [mapOptions]="mapOptions"
   [persistView]="true"
   (mapReady)="onMapReady($event)">
+
+  @if (drawMode() === 'none') {
+    <button mat-mini-fab class="map-fab" (click)="startDraw()" aria-label="Fläche zeichnen">
+      <mat-icon>pentagon</mat-icon>
+    </button>
+    <button mat-mini-fab class="map-fab" (click)="startEdit()" [disabled]="!hasLayers" aria-label="Bearbeiten">
+      <mat-icon>edit</mat-icon>
+    </button>
+    <button mat-mini-fab class="map-fab" (click)="startDelete()" [disabled]="!hasLayers" aria-label="Löschen">
+      <mat-icon>delete</mat-icon>
+    </button>
+  } @else {
+    @if (drawMode() !== 'draw') {
+      <button mat-mini-fab class="map-fab" (click)="confirmMode()" aria-label="Speichern">
+        <mat-icon>check</mat-icon>
+      </button>
+    }
+    <button mat-mini-fab class="map-fab" (click)="cancelMode()" aria-label="Abbrechen">
+      <mat-icon>close</mat-icon>
+    </button>
+  }
+  <div class="map-ctrl-sep"></div>
+
 </app-map>
 
 @if (forestArea() > 0 || fieldArea() > 0) {
@@ -10,20 +33,20 @@
     @if (forestArea() > 0) {
       <div class="total-area-row">
         <span class="total-area-dot" style="background:#2d6a4f"></span>
-        <span class="total-area-label">Forest</span>
+        <span class="total-area-label">Wald</span>
         <span class="total-area-value">{{ formatArea(forestArea()) }}</span>
       </div>
     }
     @if (fieldArea() > 0) {
       <div class="total-area-row">
         <span class="total-area-dot" style="background:#e9c46a"></span>
-        <span class="total-area-label">Field</span>
+        <span class="total-area-label">Feld</span>
         <span class="total-area-value">{{ formatArea(fieldArea()) }}</span>
       </div>
     }
   </div>
 }
 
-<button mat-fab class="record-btn" routerLink="/record" aria-label="Record new area">
+<button mat-fab class="record-btn" routerLink="/record" aria-label="Neue Fläche aufnehmen">
   <mat-icon>add_location_alt</mat-icon>
 </button>

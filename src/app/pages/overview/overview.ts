@@ -25,16 +25,27 @@ export class OverviewComponent {
   visibleTypes: AreaType[] = ['forest', 'field'];
   forestArea = signal(0);
   fieldArea = signal(0);
+  drawMode = signal<'none' | 'draw' | 'edit' | 'delete'>('none');
 
   private readonly areaService = inject(AreaService);
   private drawnItems!: L.FeatureGroup;
   private layerTypes = new Map<L.Layer, AreaType>();
   private layerNames = new Map<L.Layer, string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private polygonDrawer?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private editHandler?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private deleteHandler?: any;
 
   readonly mapOptions: L.MapOptions = {
     zoom: 8,
     center: L.latLng(47.5, 14.5),
   };
+
+  get hasLayers(): boolean {
+    return (this.drawnItems?.getLayers().length ?? 0) > 0;
+  }
 
   onMapReady(map: L.Map): void {
     this.drawnItems = new L.FeatureGroup();
@@ -42,18 +53,10 @@ export class OverviewComponent {
     this.loadAreas();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const drawControl = new (L as any).Control.Draw({
-      draw: {
-        polygon: { allowIntersection: false, showArea: false },
-        polyline: false,
-        rectangle: false,
-        circle: false,
-        circlemarker: false,
-        marker: false,
-      },
-      edit: { featureGroup: this.drawnItems },
-    });
-    map.addControl(drawControl);
+    const LA = L as any;
+    this.polygonDrawer = new LA.Draw.Polygon(map, { allowIntersection: false, showArea: false });
+    this.editHandler   = new LA.EditToolbar.Edit(map, { featureGroup: this.drawnItems });
+    this.deleteHandler = new LA.EditToolbar.Delete(map, { featureGroup: this.drawnItems });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.on('draw:created', (e: any) => {
@@ -64,6 +67,7 @@ export class OverviewComponent {
       this.drawnItems.addLayer(layer);
       this.updateTotalArea();
       this.saveAreas();
+      this.drawMode.set('none');
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.on('draw:edited', (e: any) => {
@@ -79,6 +83,32 @@ export class OverviewComponent {
       this.updateTotalArea();
       this.saveAreas();
     });
+  }
+
+  startDraw(): void    { this.setDrawMode('draw'); }
+  startEdit(): void    { this.setDrawMode('edit'); }
+  startDelete(): void  { this.setDrawMode('delete'); }
+
+  confirmMode(): void {
+    if (this.drawMode() === 'edit')   this.editHandler.save();
+    if (this.drawMode() === 'delete') this.deleteHandler.save();
+    this.setDrawMode('none');
+  }
+
+  cancelMode(): void { this.setDrawMode('none'); }
+
+  private setDrawMode(mode: 'none' | 'draw' | 'edit' | 'delete'): void {
+    switch (this.drawMode()) {
+      case 'draw':   this.polygonDrawer.disable(); break;
+      case 'edit':   this.editHandler.disable();   break;
+      case 'delete': this.deleteHandler.disable(); break;
+    }
+    this.drawMode.set(mode);
+    switch (mode) {
+      case 'draw':   this.polygonDrawer.enable(); break;
+      case 'edit':   this.editHandler.enable();   break;
+      case 'delete': this.deleteHandler.enable();  break;
+    }
   }
 
   formatArea(m2: number): string {
@@ -127,7 +157,7 @@ export class OverviewComponent {
     const nameInput = document.createElement('input');
     nameInput.className = 'area-name-input';
     nameInput.type = 'text';
-    nameInput.placeholder = 'Name…';
+    nameInput.placeholder = 'Name …';
     nameInput.value = this.layerNames.get(layer) ?? '';
     const nameBtn = document.createElement('button');
     nameBtn.className = 'area-name-save';
