@@ -31,6 +31,9 @@ export class App implements OnInit {
         });
         snack.onAction().subscribe(() => document.location.reload());
       });
+
+    this.swUpdate.checkForUpdate();
+    setInterval(() => this.swUpdate.checkForUpdate(), 2 * 60 * 1000);
   }
 
   async signOut(): Promise<void> {
