@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,7 +17,7 @@ import { AreaService } from '../../shared/area.service';
   styleUrl: './overview.scss',
   imports: [MapComponent, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, FormsModule, RouterLink],
 })
-export class OverviewComponent {
+export class OverviewComponent implements OnDestroy {
   readonly areaTypes = Object.entries(AREA_TYPES).map(([key, val]) => ({
     key: key as AreaType,
     ...val,
@@ -31,12 +32,16 @@ export class OverviewComponent {
   private drawnItems!: L.FeatureGroup;
   private layerTypes = new Map<L.Layer, AreaType>();
   private layerNames = new Map<L.Layer, string>();
+  private layerIds = new Map<L.Layer, string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private polygonDrawer?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private editHandler?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private deleteHandler?: any;
+  private suppressUntil = 0;
+  private pendingSyncAreas: SavedArea[] | null = null;
+  private areasSubscription?: Subscription;
 
   readonly mapOptions: L.MapOptions = {
     zoom: 8,
@@ -50,7 +55,6 @@ export class OverviewComponent {
   onMapReady(map: L.Map): void {
     this.drawnItems = new L.FeatureGroup();
     map.addLayer(this.drawnItems);
-    this.loadAreas();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const LA = L as any;
@@ -58,31 +62,57 @@ export class OverviewComponent {
     this.editHandler   = new LA.EditToolbar.Edit(map, { featureGroup: this.drawnItems });
     this.deleteHandler = new LA.EditToolbar.Delete(map, { featureGroup: this.drawnItems });
 
+    this.areasSubscription = this.areaService.watchAreas().subscribe(areas => {
+      if (Date.now() < this.suppressUntil) return;
+      if (this.drawMode() !== 'none') {
+        this.pendingSyncAreas = areas;
+        return;
+      }
+      this.syncAreas(areas);
+    });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.on('draw:created', (e: any) => {
       const layer = e.layer as L.Polygon;
+      this.layerIds.set(layer, crypto.randomUUID());
       this.setLayerType(layer, 'forest');
       this.bindTypePopup(layer);
       this.updateAreaLabel(layer);
       this.drawnItems.addLayer(layer);
       this.updateTotalArea();
-      this.saveAreas();
+      this.persist(layer);
       this.drawMode.set('none');
     });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.on('draw:edited', (e: any) => {
       e.layers.eachLayer((layer: L.Layer) => {
-        if (layer instanceof L.Polygon) this.updateAreaLabel(layer);
+        if (layer instanceof L.Polygon) {
+          this.updateAreaLabel(layer);
+          this.persist(layer);
+        }
       });
       this.updateTotalArea();
-      this.saveAreas();
     });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.on('draw:deleted', (e: any) => {
-      e.layers.eachLayer((layer: L.Layer) => { this.layerTypes.delete(layer); this.layerNames.delete(layer); });
+      e.layers.eachLayer((layer: L.Layer) => {
+        const id = this.layerIds.get(layer);
+        if (id) {
+          this.suppress();
+          this.areaService.deleteArea(id);
+        }
+        this.layerTypes.delete(layer);
+        this.layerNames.delete(layer);
+        this.layerIds.delete(layer);
+      });
       this.updateTotalArea();
-      this.saveAreas();
     });
+  }
+
+  ngOnDestroy(): void {
+    this.areasSubscription?.unsubscribe();
   }
 
   startDraw(): void    { this.setDrawMode('draw'); }
@@ -112,11 +142,41 @@ export class OverviewComponent {
       case 'draw':   this.polygonDrawer.enable(); break;
       case 'edit':   this.editHandler.enable();   break;
       case 'delete': this.deleteHandler.enable();  break;
+      case 'none':
+        if (this.pendingSyncAreas) {
+          const areas = this.pendingSyncAreas;
+          this.pendingSyncAreas = null;
+          this.syncAreas(areas);
+        }
+        break;
     }
   }
 
   formatArea(m2: number): string {
     return `${(m2 / 10000).toFixed(4)} ha`;
+  }
+
+  private suppress(): void {
+    this.suppressUntil = Date.now() + 2000;
+    this.pendingSyncAreas = null;
+  }
+
+  private persist(layer: L.Polygon): void {
+    this.suppress();
+    this.areaService.saveArea(this.toSavedArea(layer));
+  }
+
+  private toSavedArea(layer: L.Polygon): SavedArea {
+    const ring = layer.getLatLngs()[0] as L.LatLng[];
+    const type = this.layerTypes.get(layer) ?? 'forest';
+    const name = this.layerNames.get(layer);
+    const id = this.layerIds.get(layer)!;
+    return {
+      id,
+      ...(name ? { name } : {}),
+      type,
+      points: ring.map((ll) => [ll.lat, ll.lng]),
+    };
   }
 
   private calculateArea(layer: L.Polygon): number {
@@ -171,7 +231,7 @@ export class OverviewComponent {
       if (name) { this.layerNames.set(layer, name); } else { this.layerNames.delete(layer); }
       this.updateAreaLabel(layer);
       layer.closePopup();
-      this.saveAreas();
+      this.persist(layer);
     });
     nameRow.appendChild(nameInput);
     nameRow.appendChild(nameBtn);
@@ -195,7 +255,7 @@ export class OverviewComponent {
       const type = btn.dataset['type'] as AreaType;
       this.setLayerType(layer, type);
       layer.closePopup();
-      this.saveAreas();
+      this.persist(layer);
       this.updateTotalArea();
     });
 
@@ -207,36 +267,21 @@ export class OverviewComponent {
     return { color, fillColor: color, fillOpacity: 0.35, weight: 2, stroke: true, opacity: 1 };
   }
 
-  private loadAreas(): void {
-    this.areaService.loadAreas().then((areas) => {
-      for (const area of areas) {
-        const type: AreaType = (area.type in AREA_TYPES) ? area.type : 'forest';
-        const layer = L.polygon(area.points);
-        this.setLayerType(layer, type);
-        if (area.name) this.layerNames.set(layer, area.name);
-        this.bindTypePopup(layer);
-        this.updateAreaLabel(layer);
-        layer.addTo(this.drawnItems);
-      }
-      this.updateTotalArea();
-    });
-  }
-
-  private saveAreas(): void {
-    const areas: SavedArea[] = [];
-    this.drawnItems.eachLayer((layer) => {
-      if (layer instanceof L.Polygon) {
-        const ring = layer.getLatLngs()[0] as L.LatLng[];
-        const type = this.layerTypes.get(layer) ?? 'forest';
-        const name = this.layerNames.get(layer);
-        areas.push({
-          id: crypto.randomUUID(),
-          ...(name ? { name } : {}),
-          type,
-          points: ring.map((ll) => [ll.lat, ll.lng]),
-        });
-      }
-    });
-    this.areaService.saveAll(areas);
+  private syncAreas(areas: SavedArea[]): void {
+    this.drawnItems.clearLayers();
+    this.layerTypes.clear();
+    this.layerNames.clear();
+    this.layerIds.clear();
+    for (const area of areas) {
+      const type: AreaType = (area.type in AREA_TYPES) ? area.type : 'forest';
+      const layer = L.polygon(area.points);
+      this.layerIds.set(layer, area.id);
+      this.setLayerType(layer, type);
+      if (area.name) this.layerNames.set(layer, area.name);
+      this.bindTypePopup(layer);
+      this.updateAreaLabel(layer);
+      layer.addTo(this.drawnItems);
+    }
+    this.updateTotalArea();
   }
 }

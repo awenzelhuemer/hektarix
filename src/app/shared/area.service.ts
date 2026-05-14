@@ -2,12 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
   collection,
+  collectionData,
   doc,
-  getDocs,
   setDoc,
   deleteDoc,
-  writeBatch,
 } from '@angular/fire/firestore';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { SavedArea, AreaType } from './area';
 
 interface StoredArea {
@@ -37,9 +38,10 @@ export class AreaService {
     return doc(this.firestore, `areas/${id}`);
   }
 
-  async loadAreas(): Promise<SavedArea[]> {
-    const snap = await getDocs(this.col);
-    return snap.docs.map((d) => fromStored(d.data() as StoredArea));
+  watchAreas(): Observable<SavedArea[]> {
+    return (collectionData(this.col) as Observable<StoredArea[]>).pipe(
+      map(docs => docs.map(fromStored))
+    );
   }
 
   async saveArea(area: SavedArea): Promise<void> {
@@ -48,13 +50,5 @@ export class AreaService {
 
   async deleteArea(id: string): Promise<void> {
     await deleteDoc(this.areaDoc(id));
-  }
-
-  async saveAll(areas: SavedArea[]): Promise<void> {
-    const snap = await getDocs(this.col);
-    const batch = writeBatch(this.firestore);
-    snap.docs.forEach((d) => batch.delete(d.ref));
-    areas.forEach((area) => batch.set(this.areaDoc(area.id), toStored(area)));
-    await batch.commit();
   }
 }
