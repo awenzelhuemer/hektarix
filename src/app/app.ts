@@ -5,7 +5,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import { SwUpdate, VersionDetectedEvent, VersionInstallationFailedEvent, VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs';
 import { AuthService } from './shared/auth.service';
 
@@ -28,18 +28,27 @@ export class App implements OnInit {
   ngOnInit(): void {
     if (!this.swUpdate.isEnabled) return;
 
-    this.swUpdate.versionUpdates
-      .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
-      .subscribe(() => {
-        const snack = this.snackBar.open('Eine neue Version ist verfügbar.', 'Aktualisieren', {
-          duration: 0,
-        });
-        snack.onAction().subscribe(() => document.location.reload());
-      });
+    this.swUpdate.versionUpdates.subscribe((e) => {
+      switch (e.type) {
+        case 'VERSION_DETECTED':
+          console.log('[SW] VERSION_DETECTED:', (e as VersionDetectedEvent).version);
+          break;
+        case 'VERSION_READY':
+          console.log('[SW] VERSION_READY:', (e as VersionReadyEvent).latestVersion);
+          this.showUpdateQuestion();
+          break;
+        case 'VERSION_INSTALLATION_FAILED':
+          console.error('[SW] VERSION_INSTALLATION_FAILED:', (e as VersionInstallationFailedEvent).error);
+          break;
+      }
+    });
 
-    this.swUpdate.unrecoverable.subscribe(() => document.location.reload());
+    this.swUpdate.unrecoverable.subscribe((e) => {
+      console.error('[SW] Unrecoverable state:', e);
+      document.location.reload();
+    });
 
-    const check = () => this.swUpdate.checkForUpdate().catch(() => {});
+    const check = () => this.swUpdate.checkForUpdate().catch(() => { });
     check();
     setInterval(check, 2 * 60 * 1000);
   }
@@ -47,5 +56,15 @@ export class App implements OnInit {
   async signOut(): Promise<void> {
     await this.authService.signOut();
     this.router.navigate(['/login']);
+  }
+
+  showUpdateQuestion() {
+    const snack = this.snackBar.open('Eine neue Version ist verfügbar.', 'Aktualisieren', {
+          duration: 0,
+        });
+        snack.onAction().subscribe(async () => {
+          await this.swUpdate.activateUpdate();
+          document.location.reload()
+        });
   }
 }
