@@ -50,7 +50,7 @@
     <mat-button-toggle-group [(ngModel)]="areaType" class="type-toggle">
       @for (t of areaTypes; track t.key) {
         <mat-button-toggle [value]="t.key">
-          <span class="type-dot" [style.background]="t.color"></span>{{ t.label }}
+          <mat-icon [style.color]="t.color">{{ t.icon }}</mat-icon>{{ t.label }}
         </mat-button-toggle>
       }
     </mat-button-toggle-group>

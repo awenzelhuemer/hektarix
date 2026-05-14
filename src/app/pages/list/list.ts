@@ -1,47 +1,74 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDivider } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
 import { AREA_TYPES, AreaType, SavedArea } from '../../shared/area';
 import { AreaService } from '../../shared/area.service';
 import { AreaEditDialogComponent } from './../../dialogs/area-edit-dialog';
+
+type SortField = 'name' | 'area';
+type SortDir = 'asc' | 'desc';
 
 @Component({
   selector: 'app-list',
   templateUrl: './list.html',
   styleUrl: './list.scss',
-  imports: [MatButtonModule, MatDivider, MatIconModule, MatListModule],
+  imports: [MatButtonModule, MatDivider, MatIconModule],
 })
 export class ListComponent {
   private readonly areaService = inject(AreaService);
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
 
+  readonly sortBy = signal<SortField>('name');
+  readonly sortDir = signal<SortDir>('asc');
+
   readonly areas = toSignal(this.areaService.watchAreas(), { initialValue: [] as SavedArea[] });
 
-  readonly grouped = computed(() =>
-    (Object.keys(AREA_TYPES) as AreaType[])
-      .map(type => ({
-        type,
-        label: AREA_TYPES[type].label,
-        color: AREA_TYPES[type].color,
-        areas: this.areas().filter(a => a.type === type),
-        totalArea: this.areas()
+  readonly grouped = computed(() => {
+    const sortBy = this.sortBy();
+    const sortDir = this.sortDir();
+
+    return (Object.keys(AREA_TYPES) as AreaType[])
+      .map(type => {
+        const areas = this.areas()
           .filter(a => a.type === type)
-          .reduce((sum, a) => sum + this.calcArea(a.points), 0),
-      }))
-      .filter(g => g.areas.length > 0)
-  );
+          .slice()
+          .sort((a, b) => {
+            const cmp = sortBy === 'name'
+              ? (a.name ?? '').localeCompare(b.name ?? '', 'de', { sensitivity: 'base' })
+              : this.calcArea(a.points) - this.calcArea(b.points);
+            return sortDir === 'asc' ? cmp : -cmp;
+          });
+
+        return {
+          type,
+          label: AREA_TYPES[type].label,
+          color: AREA_TYPES[type].color,
+          icon: AREA_TYPES[type].icon,
+          areas,
+          totalArea: areas.reduce((sum, a) => sum + this.calcArea(a.points), 0),
+        };
+      })
+      .filter(g => g.areas.length > 0);
+  });
+
+  toggleSort(field: SortField): void {
+    if (this.sortBy() === field) {
+      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortBy.set(field);
+      this.sortDir.set('asc');
+    }
+  }
 
   formatDate(ts?: number): string {
     if (!ts) return '—';
-    return new Date(ts).toLocaleString('de-AT', {
+    return new Date(ts).toLocaleDateString('de-AT', {
       day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
     });
   }
 

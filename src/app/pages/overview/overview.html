@@ -19,14 +19,14 @@
   <div class="total-area">
     @if (forestArea() > 0) {
       <div class="total-area-row">
-        <span class="total-area-dot" style="background:#2d6a4f"></span>
+        <mat-icon class="total-area-icon" style="color:#2d6a4f">forest</mat-icon>
         <span class="total-area-label">Wald</span>
         <span class="total-area-value">{{ formatArea(forestArea()) }}</span>
       </div>
     }
     @if (fieldArea() > 0) {
       <div class="total-area-row">
-        <span class="total-area-dot" style="background:#e9c46a"></span>
+        <mat-icon class="total-area-icon" style="color:#e9c46a">wheat</mat-icon>
         <span class="total-area-label">Feld</span>
         <span class="total-area-value">{{ formatArea(fieldArea()) }}</span>
       </div>

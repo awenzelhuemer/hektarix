@@ -30,10 +30,10 @@ app-map {
     gap: 8px;
   }
 
-  .total-area-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
+  .total-area-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
   }
 
@@ -48,13 +48,4 @@ app-map {
     font-weight: 600;
     color: #1b5e20;
   }
-}
-
-.type-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-right: 6px;
-  vertical-align: middle;
 }

@@ -1,21 +1,31 @@
 <h2 mat-dialog-title>Fläche bearbeiten</h2>
 
 <mat-dialog-content>
-  <mat-form-field appearance="outline" class="full-width">
+  <mat-form-field  class="full-width">
     <mat-label>Name</mat-label>
     <input matInput [(ngModel)]="name" placeholder="z. B. Nordfeld">
   </mat-form-field>
-  <mat-form-field appearance="outline" class="full-width">
+  <mat-form-field  class="full-width">
     <mat-label>Notiz</mat-label>
     <textarea matInput [(ngModel)]="note" rows="3" placeholder="Optionale Notiz..."></textarea>
   </mat-form-field>
   <mat-button-toggle-group [(ngModel)]="type">
     @for (t of areaTypes; track t.key) {
       <mat-button-toggle [value]="t.key">
-        <span class="type-dot" [style.background]="t.color"></span>{{ t.label }}
+        <mat-icon [style.color]="t.color">{{ t.icon }}</mat-icon>{{ t.label }}
       </mat-button-toggle>
     }
   </mat-button-toggle-group>
+  <div class="date-info">
+    <div class="date-row">
+      <span class="date-label">Erstellt</span>
+      <span>{{ formatDate(createdAt) }}</span>
+    </div>
+    <div class="date-row">
+      <span class="date-label">Bearbeitet</span>
+      <span>{{ formatDate(lastModifiedAt) }}</span>
+    </div>
+  </div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
