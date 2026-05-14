@@ -117,7 +117,7 @@ export class OverviewComponent implements OnDestroy {
   }
 
   formatArea(m2: number): string {
-    return `${(m2 / 10000).toFixed(4)} ha`;
+    return `${(m2 / 10000).toFixed(2)} ha`;
   }
 
   private suppress(): void {

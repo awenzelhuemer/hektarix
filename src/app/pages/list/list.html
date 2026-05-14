@@ -5,23 +5,31 @@
   </div>
 }
 
-<div class="sort-bar">
-  <button mat-button class="sort-btn" [class.active]="sortBy() === 'name'" (click)="toggleSort('name')">
-    Name
-    @if (sortBy() === 'name') {
-      <mat-icon>{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-    }
-  </button>
-  <button mat-button class="sort-btn" [class.active]="sortBy() === 'area'" (click)="toggleSort('area')">
-    Hektar
-    @if (sortBy() === 'area') {
-      <mat-icon>{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-    }
-  </button>
-</div>
+@if (grouped().length > 0) {
+  <div class="list-header">
+    <div class="header-total">
+      <span class="header-total-value">{{ formatArea(totalArea()) }}</span>
+      <span class="header-total-label">Gesamtfläche</span>
+    </div>
+    <div class="header-sort">
+      <button class="sort-chip" [class.active]="sortBy() === 'name'" (click)="toggleSort('name')">
+        Name
+        @if (sortBy() === 'name') {
+          <mat-icon>{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+        }
+      </button>
+      <button class="sort-chip" [class.active]="sortBy() === 'area'" (click)="toggleSort('area')">
+        Hektar
+        @if (sortBy() === 'area') {
+          <mat-icon>{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+        }
+      </button>
+    </div>
+  </div>
+}
 
 @for (group of grouped(); track group.type) {
-  <div class="group-header">
+  <div class="group-header" [style.border-left-color]="group.color">
     <mat-icon class="group-icon" [style.color]="group.color">{{ group.icon }}</mat-icon>
     <span class="group-title">{{ group.label }}</span>
     <span class="group-total">{{ formatArea(group.totalArea) }}</span>

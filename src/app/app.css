@@ -4,6 +4,42 @@
   height: 100dvh;
 }
 
+.app-toolbar {
+  position: relative;
+  background: linear-gradient(120deg, #0d2b1a 0%, #1a4d32 60%, #2d6a4f 100%) !important;
+  overflow: hidden;
+  flex-shrink: 0;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.toolbar-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  pointer-events: none;
+  padding: 0 8px;
+  overflow: hidden;
+
+  mat-icon {
+    font-size: 52px;
+    width: 52px;
+    height: 52px;
+    color: rgba(255, 255, 255, 0.07);
+    transform: translateY(12px);
+  }
+}
+
+.toolbar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.02em;
+  position: relative;
+}
+
 .toolbar-spacer {
   flex: 1;
 }
@@ -14,10 +50,12 @@
   border-radius: 50%;
   margin-right: 8px;
   object-fit: cover;
+  position: relative;
 }
 
 .toolbar-btn {
   color: white;
+  position: relative;
 }
 
 .bottom-nav {

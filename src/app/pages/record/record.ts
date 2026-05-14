@@ -13,7 +13,7 @@ import { AREA_TYPES, AreaType } from '../../shared/area';
 import { GeolocationService } from '../../shared/geolocation.service';
 import { AreaService } from '../../shared/area.service';
 
-type RecordState = 'idle' | 'recording' | 'completing';
+type RecordState = 'recording' | 'completing';
 
 @Component({
   selector: 'app-record',
@@ -22,7 +22,7 @@ type RecordState = 'idle' | 'recording' | 'completing';
   imports: [MapComponent, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatButtonToggleModule],
 })
 export class RecordComponent implements OnDestroy {
-  state: RecordState = 'idle';
+  state: RecordState = 'recording';
   points = signal<[number, number][]>([]);
   name = '';
   note = '';
@@ -69,12 +69,7 @@ export class RecordComponent implements OnDestroy {
         this.existingAreaLayers.push(layer);
       }
     });
-  }
 
-  startRecording(): void {
-    this.state = 'recording';
-    this.points.set([]);
-    this.clearLayers();
     this.beginWatch();
   }
 
@@ -150,10 +145,11 @@ export class RecordComponent implements OnDestroy {
   cancel(): void {
     this.stopWatch();
     this.clearLayers();
-    this.state = 'idle';
+    this.state = 'recording';
     this.points.set([]);
     this.name = '';
     this.note = '';
+    this.beginWatch();
   }
 
   private beginWatch(): void {

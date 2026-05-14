@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AREA_TYPES, AreaType, SavedArea } from '../../shared/area';
 import { AreaService } from '../../shared/area.service';
 import { AreaEditDialogComponent } from './../../dialogs/area-edit-dialog';
+import { ConfirmDialogComponent } from './../../dialogs/confirm-dialog';
 
 type SortField = 'name' | 'area';
 type SortDir = 'asc' | 'desc';
@@ -27,6 +28,10 @@ export class ListComponent {
   readonly sortDir = signal<SortDir>('asc');
 
   readonly areas = toSignal(this.areaService.watchAreas(), { initialValue: [] as SavedArea[] });
+
+  readonly totalArea = computed(() =>
+    this.areas().reduce((sum, a) => sum + this.calcArea(a.points), 0)
+  );
 
   readonly grouped = computed(() => {
     const sortBy = this.sortBy();
@@ -104,6 +109,14 @@ export class ListComponent {
 
   delete(area: SavedArea, event: Event): void {
     event.stopPropagation();
-    this.areaService.deleteArea(area.id);
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Fläche löschen',
+        message: `Soll "${area.name ?? 'Unbenannt'}" wirklich gelöscht werden?`,
+      },
+      width: '320px',
+    }).afterClosed().subscribe(confirmed => {
+      if (confirmed) this.areaService.deleteArea(area.id);
+    });
   }
 }
