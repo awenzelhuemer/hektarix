@@ -1,5 +1,5 @@
 export const AREA_TYPES = {
-  forest: { label: 'Wald', color: '#2d6a4f', icon: 'forest' },
+  forest: { label: 'Wald', color: '#52b788', icon: 'forest' },
   field:  { label: 'Feld',  color: '#e9c46a', icon: 'wheat'  },
 } as const;
 
