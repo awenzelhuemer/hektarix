@@ -1,0 +1,41 @@
+@if (grouped().length === 0) {
+<div class="empty-state">
+  <mat-icon>grass</mat-icon>
+  <p>Noch keine Flächen eingetragen.</p>
+</div>
+}
+
+@for (group of grouped(); track group.type) {
+<div class="group-header">
+  <span class="group-dot" [style.background]="group.color"></span>
+  <span class="group-title">{{ group.label }}</span>
+  <span class="group-total">{{ formatArea(group.totalArea) }}</span>
+</div>
+<mat-list>
+  @for (area of group.areas; track area.id) {
+  <mat-list-item (click)="openEdit(area)" class="area-item">
+    <span matListItemTitle>{{ area.name ?? 'Unbenannt' }}</span>
+    <span matListItemLine>{{ formatArea(calcArea(area.points)) }}</span>
+    @if (area.note) {
+    <span matListItemLine class="area-note">{{ area.note }}</span>
+    }
+    <div matListItemLine>
+      <div class="area-dates">
+        <span>Erstellt: {{ formatDate(area.createdAt) }}</span>
+        <span>Bearbeitet: {{ formatDate(area.lastModifiedAt) }}</span>
+      </div>
+    </div>
+
+    <div matListItemMeta class="item-actions">
+      <button mat-icon-button (click)="editShape(area, $event)" aria-label="Form bearbeiten">
+        <mat-icon>map</mat-icon>
+      </button>
+      <button mat-icon-button color="warn" (click)="delete(area, $event)" aria-label="Löschen">
+        <mat-icon>delete</mat-icon>
+      </button>
+    </div>
+  </mat-list-item>
+  }
+</mat-list>
+<mat-divider />
+}

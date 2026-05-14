@@ -1,9 +1,7 @@
 import { Component, inject, signal, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { LeafletDrawModule } from '@bluehalo/ngx-leaflet-draw';
 import * as L from 'leaflet';
@@ -15,33 +13,30 @@ import { AreaService } from '../../shared/area.service';
   selector: 'app-overview',
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
-  imports: [MapComponent, LeafletDrawModule, MatButtonToggleModule, MatButtonModule, MatIconModule, FormsModule, RouterLink],
+  imports: [MapComponent, LeafletDrawModule, MatButtonModule, MatIconModule],
 })
 export class OverviewComponent implements OnDestroy {
-  readonly areaTypes = Object.entries(AREA_TYPES).map(([key, val]) => ({
-    key: key as AreaType,
-    ...val,
-  }));
-
   visibleTypes: AreaType[] = ['forest', 'field'];
   forestArea = signal(0);
   fieldArea = signal(0);
-  drawMode = signal<'none' | 'draw' | 'edit' | 'delete'>('none');
+  drawMode = signal<'none' | 'edit-single'>('none');
 
   private readonly areaService = inject(AreaService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private drawnItems!: L.FeatureGroup;
   private layerTypes = new Map<L.Layer, AreaType>();
   private layerNames = new Map<L.Layer, string>();
   private layerIds = new Map<L.Layer, string>();
+  private layerCreatedAt = new Map<L.Layer, number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private polygonDrawer?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private editHandler?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private deleteHandler?: any;
+  private singleEditHandler?: any;
   private suppressUntil = 0;
   private pendingSyncAreas: SavedArea[] | null = null;
   private areasSubscription?: Subscription;
+  private routeSub?: Subscription;
+  private pendingEditId: string | null = null;
+  private map?: L.Map;
 
   readonly mapOptions: L.MapOptions = {
     zoom: 8,
@@ -53,14 +48,17 @@ export class OverviewComponent implements OnDestroy {
   }
 
   onMapReady(map: L.Map): void {
+    this.map = map;
     this.drawnItems = new L.FeatureGroup();
     map.addLayer(this.drawnItems);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const LA = L as any;
-    this.polygonDrawer = new LA.Draw.Polygon(map, { allowIntersection: false, showArea: false });
-    this.editHandler   = new LA.EditToolbar.Edit(map, { featureGroup: this.drawnItems });
-    this.deleteHandler = new LA.EditToolbar.Delete(map, { featureGroup: this.drawnItems });
+    this.routeSub = this.route.queryParamMap.subscribe(params => {
+      const editId = params.get('edit');
+      if (editId) {
+        this.pendingEditId = editId;
+        this.tryStartPendingEdit();
+      }
+    });
 
     this.areasSubscription = this.areaService.watchAreas().subscribe(areas => {
       if (Date.now() < this.suppressUntil) return;
@@ -69,19 +67,6 @@ export class OverviewComponent implements OnDestroy {
         return;
       }
       this.syncAreas(areas);
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    map.on('draw:created', (e: any) => {
-      const layer = e.layer as L.Polygon;
-      this.layerIds.set(layer, crypto.randomUUID());
-      this.setLayerType(layer, 'forest');
-      this.bindTypePopup(layer);
-      this.updateAreaLabel(layer);
-      this.drawnItems.addLayer(layer);
-      this.updateTotalArea();
-      this.persist(layer);
-      this.drawMode.set('none');
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,61 +79,40 @@ export class OverviewComponent implements OnDestroy {
       });
       this.updateTotalArea();
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    map.on('draw:deleted', (e: any) => {
-      e.layers.eachLayer((layer: L.Layer) => {
-        const id = this.layerIds.get(layer);
-        if (id) {
-          this.suppress();
-          this.areaService.deleteArea(id);
-        }
-        this.layerTypes.delete(layer);
-        this.layerNames.delete(layer);
-        this.layerIds.delete(layer);
-      });
-      this.updateTotalArea();
-    });
   }
 
   ngOnDestroy(): void {
     this.areasSubscription?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
-  startDraw(): void    { this.setDrawMode('draw'); }
-  startEdit(): void    { this.setDrawMode('edit'); }
-  startDelete(): void  { this.setDrawMode('delete'); }
-
   confirmMode(): void {
-    if (this.drawMode() === 'edit')   this.editHandler.save();
-    if (this.drawMode() === 'delete') this.deleteHandler.save();
+    if (this.drawMode() === 'edit-single') {
+      this.singleEditHandler?.save();
+      this.setDrawMode('none');
+      this.router.navigate(['/list']);
+      return;
+    }
     this.setDrawMode('none');
   }
 
   cancelMode(): void {
-    if (this.drawMode() === 'edit')   this.editHandler.revertLayers();
-    if (this.drawMode() === 'delete') this.deleteHandler.revertLayers();
+    if (this.drawMode() === 'edit-single') {
+      this.singleEditHandler?.revertLayers();
+      this.setDrawMode('none');
+      this.router.navigate(['/list']);
+      return;
+    }
     this.setDrawMode('none');
   }
 
-  private setDrawMode(mode: 'none' | 'draw' | 'edit' | 'delete'): void {
-    switch (this.drawMode()) {
-      case 'draw':   this.polygonDrawer.disable(); break;
-      case 'edit':   this.editHandler.disable();   break;
-      case 'delete': this.deleteHandler.disable(); break;
-    }
+  private setDrawMode(mode: 'none' | 'edit-single'): void {
+    if (this.drawMode() === 'edit-single') this.singleEditHandler?.disable();
     this.drawMode.set(mode);
-    switch (mode) {
-      case 'draw':   this.polygonDrawer.enable(); break;
-      case 'edit':   this.editHandler.enable();   break;
-      case 'delete': this.deleteHandler.enable();  break;
-      case 'none':
-        if (this.pendingSyncAreas) {
-          const areas = this.pendingSyncAreas;
-          this.pendingSyncAreas = null;
-          this.syncAreas(areas);
-        }
-        break;
+    if (mode === 'none' && this.pendingSyncAreas) {
+      const areas = this.pendingSyncAreas;
+      this.pendingSyncAreas = null;
+      this.syncAreas(areas);
     }
   }
 
@@ -171,9 +135,11 @@ export class OverviewComponent implements OnDestroy {
     const type = this.layerTypes.get(layer) ?? 'forest';
     const name = this.layerNames.get(layer);
     const id = this.layerIds.get(layer)!;
+    const createdAt = this.layerCreatedAt.get(layer);
     return {
       id,
       ...(name ? { name } : {}),
+      ...(createdAt ? { createdAt } : {}),
       type,
       points: ring.map((ll) => [ll.lat, ll.lng]),
     };
@@ -212,56 +178,6 @@ export class OverviewComponent implements OnDestroy {
     layer.setStyle(visible.has(safeType) ? this.styleFor(safeType) : { opacity: 0, fillOpacity: 0, stroke: false });
   }
 
-  private bindTypePopup(layer: L.Polygon): void {
-    const container = document.createElement('div');
-    container.className = 'area-type-popup';
-
-    const nameRow = document.createElement('div');
-    nameRow.className = 'area-name-row';
-    const nameInput = document.createElement('input');
-    nameInput.className = 'area-name-input';
-    nameInput.type = 'text';
-    nameInput.placeholder = 'Name …';
-    nameInput.value = this.layerNames.get(layer) ?? '';
-    const nameBtn = document.createElement('button');
-    nameBtn.className = 'area-name-save';
-    nameBtn.textContent = '✓';
-    nameBtn.addEventListener('click', () => {
-      const name = nameInput.value.trim();
-      if (name) { this.layerNames.set(layer, name); } else { this.layerNames.delete(layer); }
-      this.updateAreaLabel(layer);
-      layer.closePopup();
-      this.persist(layer);
-    });
-    nameRow.appendChild(nameInput);
-    nameRow.appendChild(nameBtn);
-    container.appendChild(nameRow);
-
-    const sep = document.createElement('hr');
-    sep.className = 'area-popup-sep';
-    container.appendChild(sep);
-
-    for (const { key, label, color } of this.areaTypes) {
-      const btn = document.createElement('button');
-      btn.className = 'area-type-btn';
-      btn.dataset['type'] = key;
-      btn.innerHTML = `<span class="area-type-dot" style="background:${color}"></span>${label}`;
-      container.appendChild(btn);
-    }
-
-    container.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-type]');
-      if (!btn) return;
-      const type = btn.dataset['type'] as AreaType;
-      this.setLayerType(layer, type);
-      layer.closePopup();
-      this.persist(layer);
-      this.updateTotalArea();
-    });
-
-    layer.bindPopup(container);
-  }
-
   private styleFor(type: AreaType): L.PathOptions {
     const { color } = AREA_TYPES[type];
     return { color, fillColor: color, fillOpacity: 0.35, weight: 2, stroke: true, opacity: 1 };
@@ -272,16 +188,38 @@ export class OverviewComponent implements OnDestroy {
     this.layerTypes.clear();
     this.layerNames.clear();
     this.layerIds.clear();
+    this.layerCreatedAt.clear();
     for (const area of areas) {
       const type: AreaType = (area.type in AREA_TYPES) ? area.type : 'forest';
       const layer = L.polygon(area.points);
       this.layerIds.set(layer, area.id);
       this.setLayerType(layer, type);
       if (area.name) this.layerNames.set(layer, area.name);
-      this.bindTypePopup(layer);
+      if (area.createdAt) this.layerCreatedAt.set(layer, area.createdAt);
       this.updateAreaLabel(layer);
       layer.addTo(this.drawnItems);
     }
     this.updateTotalArea();
+    this.tryStartPendingEdit();
+  }
+
+  private tryStartPendingEdit(): void {
+    if (!this.pendingEditId || !this.map) return;
+    const entry = [...this.layerIds.entries()].find(([, id]) => id === this.pendingEditId);
+    if (!entry) return;
+    this.pendingEditId = null;
+    this.startSingleEdit(entry[0] as L.Polygon);
+  }
+
+  private startSingleEdit(layer: L.Polygon): void {
+    if (!this.map) return;
+    this.map.fitBounds(layer.getBounds(), { padding: [60, 60] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const LA = L as any;
+    this.singleEditHandler = new LA.EditToolbar.Edit(this.map, {
+      featureGroup: new L.FeatureGroup([layer]),
+    });
+    this.singleEditHandler.enable();
+    this.drawMode.set('edit-single');
   }
 }

@@ -8,6 +8,9 @@ export type AreaType = keyof typeof AREA_TYPES;
 export interface SavedArea {
   id: string;
   name?: string;
+  note?: string;
   type: AreaType;
   points: [number, number][];
+  createdAt?: number;
+  lastModifiedAt?: number;
 }

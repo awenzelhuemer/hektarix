@@ -10,4 +10,22 @@
     </button>
   }
 </mat-toolbar>
+
 <router-outlet />
+
+@if (authService.user()) {
+  <nav class="bottom-nav">
+    <a class="bottom-nav-item" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <mat-icon>map</mat-icon>
+      <span>Karte</span>
+    </a>
+    <a class="bottom-nav-item" routerLink="/list" routerLinkActive="active">
+      <mat-icon>format_list_bulleted</mat-icon>
+      <span>Liste</span>
+    </a>
+    <a class="bottom-nav-item" routerLink="/record" routerLinkActive="active">
+      <mat-icon>fiber_manual_record</mat-icon>
+      <span>Aufzeichnung</span>
+    </a>
+  </nav>
+}

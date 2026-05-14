@@ -14,12 +14,23 @@ import { SavedArea, AreaType } from './area';
 interface StoredArea {
   id: string;
   name?: string;
+  note?: string;
   type: AreaType;
   points: { lat: number; lng: number }[];
+  createdAt?: number;
+  lastModifiedAt?: number;
 }
 
 function toStored(area: SavedArea): StoredArea {
-  return { ...area, points: area.points.map(([lat, lng]) => ({ lat, lng })) };
+  return {
+    id: area.id,
+    type: area.type,
+    points: area.points.map(([lat, lng]) => ({ lat, lng })),
+    ...(area.name ? { name: area.name } : {}),
+    ...(area.note ? { note: area.note } : {}),
+    ...(area.createdAt ? { createdAt: area.createdAt } : {}),
+    lastModifiedAt: Date.now(),
+  };
 }
 
 function fromStored(data: StoredArea): SavedArea {
