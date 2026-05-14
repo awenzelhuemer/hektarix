@@ -7,13 +7,20 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import * as L from 'leaflet';
-import { MapComponent } from '../../shared/map/map.component';
+import Map from 'ol/Map';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
+import Polygon from 'ol/geom/Polygon';
+import { fromLonLat, toLonLat } from 'ol/proj';
+import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
+import { MapComponent, OlMapOptions } from '../../shared/map/map.component';
 import { AREA_TYPES, AreaType } from '../../shared/area';
 import { GeolocationService } from '../../shared/geolocation.service';
 import { AreaService } from '../../shared/area.service';
 
-type RecordState = 'recording' | 'completing';
+type RecordState = 'idle' | 'recording' | 'kataster' | 'completing';
 
 @Component({
   selector: 'app-record',
@@ -22,7 +29,8 @@ type RecordState = 'recording' | 'completing';
   imports: [MapComponent, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatButtonToggleModule],
 })
 export class RecordComponent implements OnDestroy {
-  state: RecordState = 'recording';
+  state: RecordState = 'idle';
+  private activeMode: 'manual' | 'kataster' = 'manual';
   points = signal<[number, number][]>([]);
   name = '';
   note = '';
@@ -32,45 +40,112 @@ export class RecordComponent implements OnDestroy {
   locationError = signal<string | null>(null);
 
   readonly canFinish = computed(() => this.points().length >= 3);
-
   readonly areaTypes = Object.entries(AREA_TYPES).map(([key, val]) => ({ key: key as AreaType, ...val }));
 
-  readonly mapOptions: L.MapOptions = {
-    zoom: 15,
-    center: L.latLng(48.31, 14.29),
-  };
+  readonly mapOptions: OlMapOptions = { zoom: 15, center: [48.31, 14.29] };
 
-  private map?: L.Map;
   private watchId?: number;
-  private polygonLayer?: L.Polygon;
-  private currentMarker?: L.CircleMarker;
-  private pointMarkers: L.CircleMarker[] = [];
-  private existingAreaLayers: L.Polygon[] = [];
+
+  private readonly drawSource = new VectorSource();
+  private readonly drawLayer = new VectorLayer({ source: this.drawSource, zIndex: 50 });
+  private readonly locationSource = new VectorSource();
+  private readonly locationLayer = new VectorLayer({ source: this.locationSource, zIndex: 100 });
+  private readonly existingSource = new VectorSource();
+  private readonly existingLayer = new VectorLayer({ source: this.existingSource, zIndex: 10 });
+
+  private polygonFeature?: Feature<Polygon>;
+  private locationFeature?: Feature<Point>;
+  private pointFeatures: Feature<Point>[] = [];
+  private map?: Map;
+  private searchTimeout?: ReturnType<typeof setTimeout>;
+
+  searchQuery = '';
+  searchResults = signal<{ lat: string; lon: string; display_name: string }[]>([]);
 
   private readonly geo = inject(GeolocationService);
   private readonly areaService = inject(AreaService);
   constructor(private router: Router) {}
 
-  onMapReady(map: L.Map): void {
+  onSearchInput(): void {
+    clearTimeout(this.searchTimeout);
+    if (!this.searchQuery.trim()) { this.searchResults.set([]); return; }
+    this.searchTimeout = setTimeout(() => this.fetchLocations(), 400);
+  }
+
+  private async fetchLocations(): Promise<void> {
+    const q = encodeURIComponent(this.searchQuery.trim());
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&countrycodes=at`,
+        { headers: { 'Accept-Language': 'de' } },
+      );
+      this.searchResults.set(await res.json());
+    } catch {
+      this.searchResults.set([]);
+    }
+  }
+
+  selectLocation(result: { lat: string; lon: string }): void {
+    this.map?.getView().animate({
+      center: fromLonLat([parseFloat(result.lon), parseFloat(result.lat)]),
+      zoom: 16, duration: 500,
+    });
+    this.searchQuery = '';
+    this.searchResults.set([]);
+  }
+
+  onMapReady(map: Map): void {
     this.map = map;
-    this.geo.getCurrentPosition().then((pos) => map.setView(pos, 17)).catch(() => {});
-    map.on('click', (e: L.LeafletMouseEvent) => {
-      if (this.state === 'recording') {
-        this.addPointAt([e.latlng.lat, e.latlng.lng]);
-      }
+    map.addLayer(this.existingLayer);
+    map.addLayer(this.drawLayer);
+    map.addLayer(this.locationLayer);
+
+    map.on('click', (e) => {
+      if (this.state !== 'recording') return;
+      const [lon, lat] = toLonLat(e.coordinate);
+      this.addPointAt([lat, lon]);
     });
 
     this.areaService.watchAreas().pipe(take(1)).subscribe(areas => {
       for (const area of areas) {
         const color = AREA_TYPES[area.type]?.color ?? '#888';
-        const layer = L.polygon(area.points, {
-          color, fillColor: color, fillOpacity: 0.2, weight: 1.5, interactive: false,
-        }).addTo(map);
-        this.existingAreaLayers.push(layer);
+        const coords = area.points.map(([lat, lon]) => fromLonLat([lon, lat]));
+        coords.push(coords[0]);
+        const feature = new Feature({ geometry: new Polygon([coords]) });
+        feature.setStyle(new Style({
+          stroke: new Stroke({ color, width: 1.5 }),
+          fill: new Fill({ color: hexWithAlpha(color, 0.2) }),
+        }));
+        this.existingSource.addFeature(feature);
       }
     });
+  }
 
+  startManual(): void {
+    this.activeMode = 'manual';
+    this.state = 'recording';
     this.beginWatch();
+  }
+
+  startKataster(): void {
+    this.activeMode = 'kataster';
+    this.state = 'kataster';
+  }
+
+  onKatasterClick(points: [number, number][]): void {
+    if (this.state !== 'kataster' || points.length < 3) return;
+    this.clearDrawings();
+    this.points.set(points);
+
+    const olCoords = points.map(([lat, lon]) => fromLonLat([lon, lat]));
+    olCoords.push(olCoords[0]);
+    this.polygonFeature = new Feature({ geometry: new Polygon([olCoords]) });
+    this.polygonFeature.setStyle(new Style({
+      stroke: new Stroke({ color: AREA_TYPES[this.areaType].color, width: 2, lineDash: [6, 4] }),
+      fill: new Fill({ color: hexWithAlpha(AREA_TYPES[this.areaType].color, 0.2) }),
+    }));
+    this.drawSource.addFeature(this.polygonFeature);
+    this.state = 'completing';
   }
 
   addPoint(): void {
@@ -80,27 +155,41 @@ export class RecordComponent implements OnDestroy {
   }
 
   private addPointAt(loc: [number, number]): void {
-    if (!this.map) return;
-
     this.points.update(pts => [...pts, loc]);
     const pts = this.points();
+    const [lat, lon] = loc;
+    const olCoord = fromLonLat([lon, lat]);
 
-    const marker = L.circleMarker(loc, {
-      radius: 6, color: '#1b5e20', fillColor: '#4caf50', fillOpacity: 1, weight: 2,
-    }).addTo(this.map);
-    marker.bindTooltip(`${pts.length}`, { permanent: true, className: 'point-number' });
-    this.pointMarkers.push(marker);
+    const pointFeature = new Feature({ geometry: new Point(olCoord) });
+    pointFeature.setStyle(new Style({
+      image: new CircleStyle({
+        radius: 6,
+        fill: new Fill({ color: '#4caf50' }),
+        stroke: new Stroke({ color: '#1b5e20', width: 2 }),
+      }),
+      text: new Text({
+        text: String(pts.length),
+        offsetY: -14,
+        font: 'bold 11px sans-serif',
+        fill: new Fill({ color: '#1b5e20' }),
+        stroke: new Stroke({ color: '#fff', width: 2 }),
+      }),
+    }));
+    this.pointFeatures.push(pointFeature);
+    this.drawSource.addFeature(pointFeature);
 
-    if (this.polygonLayer) {
-      this.polygonLayer.setLatLngs(pts);
+    const olCoords = pts.map(([la, lo]) => fromLonLat([lo, la]));
+    olCoords.push(olCoords[0]);
+
+    if (this.polygonFeature) {
+      this.polygonFeature.getGeometry()!.setCoordinates([olCoords]);
     } else if (pts.length >= 2) {
-      this.polygonLayer = L.polygon(pts, {
-        color: AREA_TYPES[this.areaType].color,
-        fillColor: AREA_TYPES[this.areaType].color,
-        fillOpacity: 0.2,
-        weight: 2,
-        dashArray: '6, 4',
-      }).addTo(this.map);
+      this.polygonFeature = new Feature({ geometry: new Polygon([olCoords]) });
+      this.polygonFeature.setStyle(new Style({
+        stroke: new Stroke({ color: AREA_TYPES[this.areaType].color, width: 2, lineDash: [6, 4] }),
+        fill: new Fill({ color: hexWithAlpha(AREA_TYPES[this.areaType].color, 0.2) }),
+      }));
+      this.drawSource.addFeature(this.polygonFeature);
     }
   }
 
@@ -108,12 +197,19 @@ export class RecordComponent implements OnDestroy {
     if (!this.points().length) return;
     this.points.update(pts => pts.slice(0, -1));
     const pts = this.points();
-    this.pointMarkers.pop()?.remove();
+
+    const removed = this.pointFeatures.pop();
+    if (removed) this.drawSource.removeFeature(removed);
+
     if (pts.length < 2) {
-      this.polygonLayer?.remove();
-      this.polygonLayer = undefined;
-    } else {
-      this.polygonLayer?.setLatLngs(pts);
+      if (this.polygonFeature) {
+        this.drawSource.removeFeature(this.polygonFeature);
+        this.polygonFeature = undefined;
+      }
+    } else if (this.polygonFeature) {
+      const olCoords = pts.map(([lat, lon]) => fromLonLat([lon, lat]));
+      olCoords.push(olCoords[0]);
+      this.polygonFeature.getGeometry()!.setCoordinates([olCoords]);
     }
   }
 
@@ -124,8 +220,14 @@ export class RecordComponent implements OnDestroy {
   }
 
   backToRecording(): void {
-    this.state = 'recording';
-    this.beginWatch();
+    this.clearDrawings();
+    this.points.set([]);
+    if (this.activeMode === 'manual') {
+      this.state = 'recording';
+      this.beginWatch();
+    } else {
+      this.state = 'kataster';
+    }
   }
 
   async save(): Promise<void> {
@@ -142,14 +244,21 @@ export class RecordComponent implements OnDestroy {
     this.router.navigate(['/']);
   }
 
+  clearRecording(): void {
+    this.clearDrawings();
+    this.points.set([]);
+    this.state = 'idle';
+    this.name = '';
+    this.note = '';
+  }
+
   cancel(): void {
     this.stopWatch();
-    this.clearLayers();
-    this.state = 'recording';
+    this.clearDrawings();
+    this.state = 'idle';
     this.points.set([]);
     this.name = '';
     this.note = '';
-    this.beginWatch();
   }
 
   private beginWatch(): void {
@@ -157,15 +266,21 @@ export class RecordComponent implements OnDestroy {
     if (this.watchId !== undefined) this.geo.clearWatch(this.watchId);
 
     this.watchId = this.geo.watch(
-      (ll) => {
-        this.currentLocation.set(ll);
-        if (!this.map) return;
-        if (this.currentMarker) {
-          this.currentMarker.setLatLng(ll);
+      ([lat, lon]) => {
+        this.currentLocation.set([lat, lon]);
+        const coord = fromLonLat([lon, lat]);
+        if (this.locationFeature) {
+          this.locationFeature.getGeometry()!.setCoordinates(coord);
         } else {
-          this.currentMarker = L.circleMarker(ll, {
-            radius: 10, color: '#1565c0', fillColor: '#42a5f5', fillOpacity: 0.9, weight: 2,
-          }).addTo(this.map);
+          this.locationFeature = new Feature({ geometry: new Point(coord) });
+          this.locationFeature.setStyle(new Style({
+            image: new CircleStyle({
+              radius: 10,
+              fill: new Fill({ color: 'rgba(66, 165, 245, 0.9)' }),
+              stroke: new Stroke({ color: '#1565c0', width: 2 }),
+            }),
+          }));
+          this.locationSource.addFeature(this.locationFeature);
         }
       },
       (err) => this.locationError.set(err),
@@ -179,18 +294,22 @@ export class RecordComponent implements OnDestroy {
     }
   }
 
-  private clearLayers(): void {
-    this.polygonLayer?.remove();
-    this.currentMarker?.remove();
-    this.pointMarkers.forEach(m => m.remove());
-    this.polygonLayer = undefined;
-    this.currentMarker = undefined;
-    this.pointMarkers = [];
+  private clearDrawings(): void {
+    this.drawSource.clear();
+    this.locationSource.clear();
+    this.polygonFeature = undefined;
+    this.locationFeature = undefined;
+    this.pointFeatures = [];
   }
 
   ngOnDestroy(): void {
     this.stopWatch();
-    this.existingAreaLayers.forEach(l => l.remove());
-    this.map = undefined;
   }
+}
+
+function hexWithAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

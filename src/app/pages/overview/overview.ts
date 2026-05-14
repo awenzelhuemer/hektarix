@@ -1,11 +1,20 @@
 import { Component, inject, signal, OnDestroy } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { LeafletDrawModule } from '@bluehalo/ngx-leaflet-draw';
-import * as L from 'leaflet';
-import { MapComponent } from '../../shared/map/map.component';
+import OlMap from 'ol/Map';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import Feature from 'ol/Feature';
+import Polygon from 'ol/geom/Polygon';
+import { fromLonLat, toLonLat } from 'ol/proj';
+import { Fill, Stroke, Style, Text } from 'ol/style';
+import { Modify } from 'ol/interaction';
+import { doubleClick } from 'ol/events/condition';
+import { getArea } from 'ol/sphere';
+import { MapComponent, OlMapOptions } from '../../shared/map/map.component';
 import { AREA_TYPES, AreaType, SavedArea } from '../../shared/area';
 import { AreaService } from '../../shared/area.service';
 
@@ -13,7 +22,7 @@ import { AreaService } from '../../shared/area.service';
   selector: 'app-overview',
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
-  imports: [MapComponent, LeafletDrawModule, MatButtonModule, MatIconModule],
+  imports: [MapComponent, FormsModule, MatButtonModule, MatIconModule],
 })
 export class OverviewComponent implements OnDestroy {
   visibleTypes: AreaType[] = ['forest', 'field'];
@@ -24,33 +33,40 @@ export class OverviewComponent implements OnDestroy {
   private readonly areaService = inject(AreaService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private drawnItems!: L.FeatureGroup;
-  private layerTypes = new Map<L.Layer, AreaType>();
-  private layerNames = new Map<L.Layer, string>();
-  private layerIds = new Map<L.Layer, string>();
-  private layerCreatedAt = new Map<L.Layer, number>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private singleEditHandler?: any;
+
+  private map?: OlMap;
+  private searchTimeout?: ReturnType<typeof setTimeout>;
+
+  searchQuery = '';
+  searchResults = signal<{ lat: string; lon: string; display_name: string }[]>([]);
+  private vectorSource = new VectorSource();
+  private vectorLayer = new VectorLayer({ source: this.vectorSource, zIndex: 50 });
+
+  private featureTypes = new Map<Feature<Polygon>, AreaType>();
+  private featureNames = new Map<Feature<Polygon>, string>();
+  private featureIds = new Map<Feature<Polygon>, string>();
+  private featureCreatedAt = new Map<Feature<Polygon>, number>();
+
+  private modifyInteraction?: Modify;
+  private modifySource?: VectorSource;
+  private editingFeature?: Feature<Polygon>;
+  private originalCoords?: number[][][];
+
   private suppressUntil = 0;
   private pendingSyncAreas: SavedArea[] | null = null;
   private areasSubscription?: Subscription;
   private routeSub?: Subscription;
   private pendingEditId: string | null = null;
-  private map?: L.Map;
 
-  readonly mapOptions: L.MapOptions = {
-    zoom: 8,
-    center: L.latLng(47.5, 14.5),
-  };
+  readonly mapOptions: OlMapOptions = { zoom: 8, center: [47.5, 14.5] };
 
   get hasLayers(): boolean {
-    return (this.drawnItems?.getLayers().length ?? 0) > 0;
+    return this.vectorSource.getFeatures().length > 0;
   }
 
-  onMapReady(map: L.Map): void {
+  onMapReady(map: OlMap): void {
     this.map = map;
-    this.drawnItems = new L.FeatureGroup();
-    map.addLayer(this.drawnItems);
+    map.addLayer(this.vectorLayer);
 
     this.routeSub = this.route.queryParamMap.subscribe(params => {
       const editId = params.get('edit');
@@ -68,17 +84,6 @@ export class OverviewComponent implements OnDestroy {
       }
       this.syncAreas(areas);
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    map.on('draw:edited', (e: any) => {
-      e.layers.eachLayer((layer: L.Layer) => {
-        if (layer instanceof L.Polygon) {
-          this.updateAreaLabel(layer);
-          this.persist(layer);
-        }
-      });
-      this.updateTotalArea();
-    });
   }
 
   ngOnDestroy(): void {
@@ -87,27 +92,57 @@ export class OverviewComponent implements OnDestroy {
   }
 
   confirmMode(): void {
-    if (this.drawMode() === 'edit-single') {
-      this.singleEditHandler?.save();
+    if (this.drawMode() === 'edit-single' && this.editingFeature) {
+      this.persist(this.editingFeature);
+      this.cleanupModify();
       this.setDrawMode('none');
       this.router.navigate(['/list']);
-      return;
     }
-    this.setDrawMode('none');
   }
 
   cancelMode(): void {
-    if (this.drawMode() === 'edit-single') {
-      this.singleEditHandler?.revertLayers();
+    if (this.drawMode() === 'edit-single' && this.editingFeature && this.originalCoords) {
+      this.editingFeature.getGeometry()!.setCoordinates(this.originalCoords);
+      this.updateFeatureLabel(this.editingFeature);
+      this.cleanupModify();
       this.setDrawMode('none');
       this.router.navigate(['/list']);
-      return;
     }
-    this.setDrawMode('none');
+  }
+
+  formatArea(m2: number): string {
+    return `${(m2 / 10000).toFixed(2)} ha`;
+  }
+
+  onSearchInput(): void {
+    clearTimeout(this.searchTimeout);
+    if (!this.searchQuery.trim()) { this.searchResults.set([]); return; }
+    this.searchTimeout = setTimeout(() => this.fetchLocations(), 400);
+  }
+
+  private async fetchLocations(): Promise<void> {
+    const q = encodeURIComponent(this.searchQuery.trim());
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&countrycodes=at`,
+        { headers: { 'Accept-Language': 'de' } },
+      );
+      this.searchResults.set(await res.json());
+    } catch {
+      this.searchResults.set([]);
+    }
+  }
+
+  selectLocation(result: { lat: string; lon: string }): void {
+    this.map?.getView().animate({
+      center: fromLonLat([parseFloat(result.lon), parseFloat(result.lat)]),
+      zoom: 16, duration: 500,
+    });
+    this.searchQuery = '';
+    this.searchResults.set([]);
   }
 
   private setDrawMode(mode: 'none' | 'edit-single'): void {
-    if (this.drawMode() === 'edit-single') this.singleEditHandler?.disable();
     this.drawMode.set(mode);
     if (mode === 'none' && this.pendingSyncAreas) {
       const areas = this.pendingSyncAreas;
@@ -116,110 +151,138 @@ export class OverviewComponent implements OnDestroy {
     }
   }
 
-  formatArea(m2: number): string {
-    return `${(m2 / 10000).toFixed(2)} ha`;
-  }
-
   private suppress(): void {
     this.suppressUntil = Date.now() + 2000;
     this.pendingSyncAreas = null;
   }
 
-  private persist(layer: L.Polygon): void {
+  private persist(feature: Feature<Polygon>): void {
     this.suppress();
-    this.areaService.saveArea(this.toSavedArea(layer));
+    this.areaService.saveArea(this.toSavedArea(feature));
   }
 
-  private toSavedArea(layer: L.Polygon): SavedArea {
-    const ring = layer.getLatLngs()[0] as L.LatLng[];
-    const type = this.layerTypes.get(layer) ?? 'forest';
-    const name = this.layerNames.get(layer);
-    const id = this.layerIds.get(layer)!;
-    const createdAt = this.layerCreatedAt.get(layer);
+  private toSavedArea(feature: Feature<Polygon>): SavedArea {
+    const ring = feature.getGeometry()!.getCoordinates()[0];
+    const points: [number, number][] = ring.slice(0, -1).map(c => {
+      const [lon, lat] = toLonLat(c);
+      return [lat, lon];
+    });
+    const type = this.featureTypes.get(feature) ?? 'forest';
+    const name = this.featureNames.get(feature);
+    const id = this.featureIds.get(feature)!;
+    const createdAt = this.featureCreatedAt.get(feature);
     return {
       id,
       ...(name ? { name } : {}),
       ...(createdAt ? { createdAt } : {}),
       type,
-      points: ring.map((ll) => [ll.lat, ll.lng]),
+      points,
     };
   }
 
-  private calculateArea(layer: L.Polygon): number {
-    const latlngs = layer.getLatLngs()[0] as L.LatLng[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (L as any).GeometryUtil.geodesicArea(latlngs);
+  private calculateArea(feature: Feature<Polygon>): number {
+    return getArea(feature.getGeometry()!);
   }
 
-  private updateAreaLabel(layer: L.Polygon): void {
-    const name = this.layerNames.get(layer);
-    const area = this.formatArea(this.calculateArea(layer));
-    const text = name ? `<strong>${name}</strong><br>${area}` : area;
-    layer.unbindTooltip();
-    layer.bindTooltip(text, { permanent: true, direction: 'center', className: 'area-label' });
+  private updateFeatureLabel(feature: Feature<Polygon>): void {
+    const name = this.featureNames.get(feature);
+    const area = this.formatArea(this.calculateArea(feature));
+    const type = this.featureTypes.get(feature) ?? 'forest';
+    const visible = this.visibleTypes.includes(type);
+    const { color } = AREA_TYPES[type];
+
+    feature.setStyle(new Style({
+      stroke: new Stroke({ color, width: 2 }),
+      fill: new Fill({ color: hexWithAlpha(color, visible ? 0.35 : 0) }),
+      text: visible ? new Text({
+        text: name ? `${name}\n${area}` : area,
+        font: '12px sans-serif',
+        fill: new Fill({ color: '#111' }),
+        backgroundFill: new Fill({ color: 'rgba(255,255,255,0.7)' }),
+        padding: [2, 4, 2, 4],
+        overflow: true,
+      }) : undefined,
+    }));
   }
 
   private updateTotalArea(): void {
     let forest = 0, field = 0;
-    this.drawnItems.eachLayer((layer) => {
-      if (!(layer instanceof L.Polygon)) return;
-      const type = this.layerTypes.get(layer) ?? 'forest';
-      if (type === 'forest') forest += this.calculateArea(layer);
-      else if (type === 'field') field += this.calculateArea(layer);
-    });
+    for (const feature of this.vectorSource.getFeatures() as Feature<Polygon>[]) {
+      const type = this.featureTypes.get(feature) ?? 'forest';
+      const area = this.calculateArea(feature);
+      if (type === 'forest') forest += area;
+      else if (type === 'field') field += area;
+    }
     this.forestArea.set(forest);
     this.fieldArea.set(field);
   }
 
-  private setLayerType(layer: L.Polygon, type: AreaType): void {
-    this.layerTypes.set(layer, type);
-    const visible = new Set(this.visibleTypes);
-    const safeType: AreaType = (type in AREA_TYPES) ? type as AreaType : 'forest';
-    layer.setStyle(visible.has(safeType) ? this.styleFor(safeType) : { opacity: 0, fillOpacity: 0, stroke: false });
-  }
-
-  private styleFor(type: AreaType): L.PathOptions {
-    const { color } = AREA_TYPES[type];
-    return { color, fillColor: color, fillOpacity: 0.35, weight: 2, stroke: true, opacity: 1 };
-  }
-
   private syncAreas(areas: SavedArea[]): void {
-    this.drawnItems.clearLayers();
-    this.layerTypes.clear();
-    this.layerNames.clear();
-    this.layerIds.clear();
-    this.layerCreatedAt.clear();
+    this.vectorSource.clear();
+    this.featureTypes.clear();
+    this.featureNames.clear();
+    this.featureIds.clear();
+    this.featureCreatedAt.clear();
+
     for (const area of areas) {
       const type: AreaType = (area.type in AREA_TYPES) ? area.type : 'forest';
-      const layer = L.polygon(area.points);
-      this.layerIds.set(layer, area.id);
-      this.setLayerType(layer, type);
-      if (area.name) this.layerNames.set(layer, area.name);
-      if (area.createdAt) this.layerCreatedAt.set(layer, area.createdAt);
-      this.updateAreaLabel(layer);
-      layer.addTo(this.drawnItems);
+      const coords = area.points.map(([lat, lon]) => fromLonLat([lon, lat]));
+      coords.push(coords[0]);
+      const feature = new Feature({ geometry: new Polygon([coords]) });
+
+      this.featureIds.set(feature, area.id);
+      this.featureTypes.set(feature, type);
+      if (area.name) this.featureNames.set(feature, area.name);
+      if (area.createdAt) this.featureCreatedAt.set(feature, area.createdAt);
+      this.updateFeatureLabel(feature);
+      this.vectorSource.addFeature(feature);
     }
+
     this.updateTotalArea();
     this.tryStartPendingEdit();
   }
 
   private tryStartPendingEdit(): void {
     if (!this.pendingEditId || !this.map) return;
-    const entry = [...this.layerIds.entries()].find(([, id]) => id === this.pendingEditId);
-    if (!entry) return;
+    const feature = (this.vectorSource.getFeatures() as Feature<Polygon>[])
+      .find(f => this.featureIds.get(f) === this.pendingEditId);
+    if (!feature) return;
     this.pendingEditId = null;
-    this.startSingleEdit(entry[0] as L.Polygon);
+    this.startSingleEdit(feature);
   }
 
-  private startSingleEdit(layer: L.Polygon): void {
+  private startSingleEdit(feature: Feature<Polygon>): void {
     if (!this.map) return;
-    this.map.fitBounds(layer.getBounds(), { padding: [60, 60] });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const LA = L as any;
-    this.singleEditHandler = new LA.EditToolbar.Edit(this.map, {
-      featureGroup: new L.FeatureGroup([layer]),
+    this.editingFeature = feature;
+    this.originalCoords = feature.getGeometry()!.getCoordinates();
+
+    const extent = feature.getGeometry()!.getExtent();
+    this.map.getView().fit(extent, { padding: [60, 60, 60, 60], duration: 400 });
+
+    this.modifySource = new VectorSource({ features: [feature] });
+    this.modifyInteraction = new Modify({ source: this.modifySource, deleteCondition: doubleClick });
+    this.modifyInteraction.on('modifyend', () => {
+      this.updateFeatureLabel(feature);
+      this.updateTotalArea();
     });
-    this.singleEditHandler.enable();
+    this.map.addInteraction(this.modifyInteraction);
     this.drawMode.set('edit-single');
   }
+
+  private cleanupModify(): void {
+    if (this.modifyInteraction) {
+      this.map?.removeInteraction(this.modifyInteraction);
+      this.modifyInteraction = undefined;
+    }
+    this.modifySource = undefined;
+    this.editingFeature = undefined;
+    this.originalCoords = undefined;
+  }
+}
+
+function hexWithAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

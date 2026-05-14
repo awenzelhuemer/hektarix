@@ -1,4 +1,52 @@
-<app-map class="map-fill" [mapOptions]="mapOptions" (mapReady)="onMapReady($event)"></app-map>
+<app-map class="map-fill" [mapOptions]="mapOptions" [persistView]="true" [katasterSelectionEnabled]="state === 'kataster'" (mapReady)="onMapReady($event)" (katasterFeatureClick)="onKatasterClick($event)"></app-map>
+
+@if (state !== 'completing') {
+  <div class="location-search">
+    <input
+      class="search-input"
+      type="search"
+      placeholder="Ort suchen…"
+      [(ngModel)]="searchQuery"
+      (input)="onSearchInput()"
+      autocomplete="off">
+    @if (searchResults().length) {
+      <ul class="search-results">
+        @for (r of searchResults(); track r.display_name) {
+          <li class="search-result-item" (click)="selectLocation(r)">{{ r.display_name }}</li>
+        }
+      </ul>
+    }
+  </div>
+}
+
+@if (state === 'idle') {
+  <div class="recording-panel">
+    <p class="point-count">Aufzeichnungsmethode wählen</p>
+    <div class="recording-actions">
+      <button mat-raised-button (click)="startManual()">
+        <mat-icon>edit_location</mat-icon>
+        Manuell
+      </button>
+      <button mat-raised-button (click)="startKataster()">
+        <mat-icon>map</mat-icon>
+        Kataster
+      </button>
+    </div>
+  </div>
+}
+
+@if (state === 'kataster') {
+  <div class="recording-panel">
+    <p class="point-count">
+      <mat-icon>map</mat-icon>
+      Parzelle antippen
+    </p>
+    <button mat-button class="reset-btn" (click)="cancel()">
+      <mat-icon>arrow_back</mat-icon>
+      Zurück
+    </button>
+  </div>
+}
 
 @if (state === 'recording') {
   <div class="recording-panel">
@@ -25,10 +73,12 @@
     @if (!canFinish()) {
       <p class="hint">Mindestens 3 Punkte erforderlich.</p>
     }
-    <button mat-button class="reset-btn" (click)="cancel()">
-      <mat-icon>restart_alt</mat-icon>
-      Zurücksetzen
-    </button>
+    <div class="reset-actions">
+      <button mat-button class="reset-btn" (click)="clearRecording()">
+        <mat-icon>arrow_back</mat-icon>
+        Zurück
+      </button>
+    </div>
   </div>
 }
 

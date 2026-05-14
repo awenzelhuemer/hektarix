@@ -1,3 +1,15 @@
+<div class="location-search">
+  <input class="search-input" type="search" placeholder="Ort suchen…"
+    [(ngModel)]="searchQuery" (input)="onSearchInput()" autocomplete="off">
+  @if (searchResults().length) {
+    <ul class="search-results">
+      @for (r of searchResults(); track r.display_name) {
+        <li class="search-result-item" (click)="selectLocation(r)">{{ r.display_name }}</li>
+      }
+    </ul>
+  }
+</div>
+
 <app-map
   class="map-container"
   [mapOptions]="mapOptions"
@@ -11,6 +23,7 @@
     <button mat-mini-fab class="map-fab" (click)="cancelMode()" aria-label="Abbrechen">
       <mat-icon>close</mat-icon>
     </button>
+    <div class="edit-hint">Doppeltippen zum Entfernen</div>
   }
 
 </app-map>
