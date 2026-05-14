@@ -10,6 +10,19 @@ app-map {
   height: 100%;
 }
 
+/* ── Shared panel animation ──────────────────────────── */
+
+@keyframes slideUpIn {
+  from {
+    transform: translateY(28px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* ── Recording state panel ───────────────────────────── */
 
 .recording-panel {
@@ -18,14 +31,20 @@ app-map {
   left: 16px;
   right: 16px;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(8px);
-  border-radius: 16px;
-  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 20px;
+  padding: 16px 16px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  gap: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  animation: slideUpIn 340ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .point-count {
@@ -34,8 +53,9 @@ app-map {
   gap: 6px;
   margin: 0;
   font-size: 14px;
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: #2a2a2a;
+
 
   mat-icon {
     font-size: 18px;
@@ -65,31 +85,43 @@ app-map {
 }
 
 .finish-btn {
-  background-color: #2d6a4f !important;
+  background: linear-gradient(135deg, #2d6a4f, #1b5e20) !important;
   color: white !important;
+  box-shadow: 0 2px 8px rgba(27, 94, 32, 0.35) !important;
+  transition: box-shadow 0.2s, transform 0.15s !important;
+
+  &:not(:disabled):hover {
+    box-shadow: 0 4px 14px rgba(27, 94, 32, 0.45) !important;
+    transform: translateY(-1px);
+  }
 
   &.mat-mdc-button-disabled {
-    background-color: rgba(0, 0, 0, 0.1) !important;
+    background: rgba(0, 0, 0, 0.08) !important;
     color: rgba(0, 0, 0, 0.3) !important;
+    box-shadow: none !important;
   }
 }
 
 .hint {
   margin: 0;
   font-size: 12px;
-  color: #888;
+  color: #999;
+
 }
 
 .error {
   margin: 0;
   font-size: 13px;
   color: #c62828;
+  font-weight: 500;
+
 }
 
 .reset-btn {
   align-self: center;
   font-size: 12px;
-  color: #999;
+  color: #aaa !important;
+  letter-spacing: 0.01em;
 }
 
 /* ── Completing state panel ──────────────────────────── */
@@ -103,13 +135,19 @@ app-map {
 }
 
 .panel {
-  background: white;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  padding: 20px 16px 16px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.07);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  animation: slideUpIn 340ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .actions {

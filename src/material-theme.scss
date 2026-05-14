@@ -8,7 +8,13 @@ html {
         primary: mat.$green-palette,
         tertiary: mat.$chartreuse-palette,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: 'Plus Jakarta Sans',
+        brand-family: 'Plus Jakarta Sans',
+        bold-weight: 700,
+        medium-weight: 600,
+        regular-weight: 400,
+      ),
       density: 0,
     )
   );
@@ -19,8 +25,14 @@ body {
   background-color: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   margin: 0;
   height: 100%;
+}
+
+/* Ensure Plus Jakarta Sans propagates into all Material components */
+* {
+  font-family: inherit;
 }
 
 :root {

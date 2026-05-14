@@ -35,8 +35,8 @@
     <span class="group-total">{{ formatArea(group.totalArea) }}</span>
   </div>
 
-  @for (area of group.areas; track area.id) {
-    <div class="area-card" (click)="openEdit(area)" [style.border-left-color]="group.color">
+  @for (area of group.areas; track area.id; let i = $index) {
+    <div class="area-card" (click)="openEdit(area)" [style.border-left-color]="group.color" [style.animation-delay]="i * 55 + 'ms'">
       <div class="area-info">
         <span class="area-name">{{ area.name ?? 'Unbenannt' }}</span>
         <span class="area-meta">{{ formatArea(calcArea(area.points)) }}{{ area.lastModifiedAt ? ' · ' + formatDate(area.lastModifiedAt) : '' }}</span>
