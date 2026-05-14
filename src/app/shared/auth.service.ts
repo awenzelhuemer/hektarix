@@ -15,7 +15,7 @@ export class AuthService {
 
   async signInWithGoogle(): Promise<void> {
     const result = await signInWithPopup(this.auth, new GoogleAuthProvider());
-    if (result.user.email !== environment.allowedEmail) {
+    if (!result.user.email || !environment.allowedEmails.includes(result.user.email)) {
       await signOut(this.auth);
       throw new Error('Dieses Konto ist nicht berechtigt, auf Hektarix zuzugreifen.');
     }

@@ -1,5 +1,8 @@
 export const environment = {
-  allowedEmail: 'andreas.wenzelhuemer@gmail.com',
+  allowedEmails: [
+    'andreas.wenzelhuemer@gmail.com',
+    'e.huber1001@gmail.com'
+  ],
   firebase: {
     apiKey: 'AIzaSyC6-e0dtWX2Cd5yRxDP1iO7uUcKBv8tOCw',
     authDomain: "hektarix.firebaseapp.com",
