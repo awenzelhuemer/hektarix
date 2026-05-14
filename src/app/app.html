@@ -25,15 +25,15 @@
 @if (authService.user()) {
   <nav class="bottom-nav">
     <a class="bottom-nav-item" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
-      <mat-icon>map</mat-icon>
+      <span class="nav-icon-wrap"><mat-icon>map</mat-icon></span>
       <span>Karte</span>
     </a>
     <a class="bottom-nav-item" routerLink="/list" routerLinkActive="active">
-      <mat-icon>format_list_bulleted</mat-icon>
+      <span class="nav-icon-wrap"><mat-icon>format_list_bulleted</mat-icon></span>
       <span>Liste</span>
     </a>
     <a class="bottom-nav-item" routerLink="/record" routerLinkActive="active">
-      <mat-icon>route</mat-icon>
+      <span class="nav-icon-wrap"><mat-icon>route</mat-icon></span>
       <span>Aufzeichnung</span>
     </a>
   </nav>
