@@ -9,7 +9,6 @@ import {
   writeBatch,
 } from '@angular/fire/firestore';
 import { SavedArea, AreaType } from './area';
-import { AuthService } from './auth.service';
 
 interface StoredArea {
   id: string;
@@ -29,18 +28,13 @@ function fromStored(data: StoredArea): SavedArea {
 @Injectable({ providedIn: 'root' })
 export class AreaService {
   private readonly firestore = inject(Firestore);
-  private readonly auth = inject(AuthService);
 
   private get col() {
-    const uid = this.auth.uid;
-    if (!uid) throw new Error('Nicht angemeldet');
-    return collection(this.firestore, `users/${uid}/areas`);
+    return collection(this.firestore, 'areas');
   }
 
   private areaDoc(id: string) {
-    const uid = this.auth.uid;
-    if (!uid) throw new Error('Nicht angemeldet');
-    return doc(this.firestore, `users/${uid}/areas/${id}`);
+    return doc(this.firestore, `areas/${id}`);
   }
 
   async loadAreas(): Promise<SavedArea[]> {
