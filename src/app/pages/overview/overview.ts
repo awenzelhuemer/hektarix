@@ -95,7 +95,11 @@ export class OverviewComponent {
     this.setDrawMode('none');
   }
 
-  cancelMode(): void { this.setDrawMode('none'); }
+  cancelMode(): void {
+    if (this.drawMode() === 'edit')   this.editHandler.revertLayers();
+    if (this.drawMode() === 'delete') this.deleteHandler.revertLayers();
+    this.setDrawMode('none');
+  }
 
   private setDrawMode(mode: 'none' | 'draw' | 'edit' | 'delete'): void {
     switch (this.drawMode()) {
