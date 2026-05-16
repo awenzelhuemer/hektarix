@@ -17,14 +17,15 @@ app-map {
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(340px, calc(100% - 110px));
+  width: min(340px, calc(100% - 120px));
   z-index: 1000;
 }
 
 .search-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 9px 14px;
+  height: 40px;
+  padding: 0 14px;
   border: none;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.95);

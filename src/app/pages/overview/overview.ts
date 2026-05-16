@@ -8,9 +8,10 @@ import OlMap from 'ol/Map';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
 import Polygon from 'ol/geom/Polygon';
 import { fromLonLat, toLonLat } from 'ol/proj';
-import { Fill, Stroke, Style, Text } from 'ol/style';
+import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 import { Modify } from 'ol/interaction';
 import { doubleClick } from 'ol/events/condition';
 import { getArea } from 'ol/sphere';
@@ -41,6 +42,8 @@ export class OverviewComponent implements OnDestroy {
   searchResults = signal<{ lat: string; lon: string; display_name: string }[]>([]);
   private vectorSource = new VectorSource();
   private vectorLayer = new VectorLayer({ source: this.vectorSource, zIndex: 50 });
+  private vertexSource = new VectorSource();
+  private vertexLayer = new VectorLayer({ source: this.vertexSource, zIndex: 60 });
 
   private featureTypes = new Map<Feature<Polygon>, AreaType>();
   private featureNames = new Map<Feature<Polygon>, string>();
@@ -67,6 +70,7 @@ export class OverviewComponent implements OnDestroy {
   onMapReady(map: OlMap): void {
     this.map = map;
     map.addLayer(this.vectorLayer);
+    map.addLayer(this.vertexLayer);
 
     this.routeSub = this.route.queryParamMap.subscribe(params => {
       const editId = params.get('edit');
@@ -262,11 +266,29 @@ export class OverviewComponent implements OnDestroy {
     this.modifySource = new VectorSource({ features: [feature] });
     this.modifyInteraction = new Modify({ source: this.modifySource, deleteCondition: doubleClick });
     this.modifyInteraction.on('modifyend', () => {
+      this.updateVertexLayer(feature);
       this.updateFeatureLabel(feature);
       this.updateTotalArea();
     });
     this.map.addInteraction(this.modifyInteraction);
+    this.updateVertexLayer(feature);
     this.drawMode.set('edit-single');
+  }
+
+  private updateVertexLayer(feature: Feature<Polygon>): void {
+    this.vertexSource.clear();
+    const coords = feature.getGeometry()!.getCoordinates()[0];
+    for (const coord of coords.slice(0, -1)) {
+      const pt = new Feature({ geometry: new Point(coord) });
+      pt.setStyle(new Style({
+        image: new CircleStyle({
+          radius: 5,
+          fill: new Fill({ color: '#fff' }),
+          stroke: new Stroke({ color: '#333', width: 2 }),
+        }),
+      }));
+      this.vertexSource.addFeature(pt);
+    }
   }
 
   private cleanupModify(): void {
@@ -274,6 +296,7 @@ export class OverviewComponent implements OnDestroy {
       this.map?.removeInteraction(this.modifyInteraction);
       this.modifyInteraction = undefined;
     }
+    this.vertexSource.clear();
     this.modifySource = undefined;
     this.editingFeature = undefined;
     this.originalCoords = undefined;

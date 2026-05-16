@@ -1,6 +1,6 @@
 {
-  "name": "hektarix",
-  "short_name": "hektarix",
+  "name": "Hektarix",
+  "short_name": "Hektarix",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

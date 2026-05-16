@@ -141,8 +141,8 @@ export class RecordComponent implements OnDestroy {
     olCoords.push(olCoords[0]);
     this.polygonFeature = new Feature({ geometry: new Polygon([olCoords]) });
     this.polygonFeature.setStyle(new Style({
-      stroke: new Stroke({ color: AREA_TYPES[this.areaType].color, width: 2, lineDash: [6, 4] }),
-      fill: new Fill({ color: hexWithAlpha(AREA_TYPES[this.areaType].color, 0.2) }),
+      stroke: new Stroke({ color: '#ff6b00', width: 3 }),
+      fill: new Fill({ color: 'rgba(255, 107, 0, 0.15)' }),
     }));
     this.drawSource.addFeature(this.polygonFeature);
     this.state = 'completing';

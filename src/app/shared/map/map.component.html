@@ -31,6 +31,15 @@
 </div>
 
 <div class="map-controls-right">
+  <button mat-mini-fab class="map-fab compass-btn" (click)="resetNorth()" aria-label="Nach Norden ausrichten">
+    <svg width="20" height="20" viewBox="-10 -10 20 20">
+      <g [style.transform]="'rotate(' + mapRotation() + 'rad)'" style="transform-origin: 0px 0px">
+        <polygon points="0,-8 3,0 0,-2 -3,0" fill="#e53935"/>
+        <polygon points="0,8 3,0 0,2 -3,0" fill="#bdbdbd"/>
+        <circle r="1.5" fill="#333"/>
+      </g>
+    </svg>
+  </button>
   <button mat-mini-fab class="map-fab" (click)="goToLocation()" aria-label="Meinen Standort anzeigen">
     <mat-icon>my_location</mat-icon>
   </button>

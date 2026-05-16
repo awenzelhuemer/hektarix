@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import Map from 'ol/Map';
@@ -91,6 +91,7 @@ export class MapComponent implements OnInit, OnDestroy {
   overlayNames: string[] = [];
   activeBaseName = '';
   layerSwitcherOpen = false;
+  readonly mapRotation = signal(0);
 
   private map?: Map;
   private locationFeature?: Feature<Point>;
@@ -145,6 +146,8 @@ export class MapComponent implements OnInit, OnDestroy {
       this.map.on('moveend', () => this.saveView(view));
     }
 
+    view.on('change:rotation', () => this.mapRotation.set(view.getRotation()));
+
     this.addKatasterHighlight();
     this.startLocationWatch(locationSource);
     this.mapReady.emit(this.map);
@@ -172,6 +175,10 @@ export class MapComponent implements OnInit, OnDestroy {
     layer.setVisible(!layer.getVisible());
     const active = this.overlayNames.filter(n => this.overlays[n].getVisible());
     localStorage.setItem(OVERLAY_KEY, JSON.stringify(active));
+  }
+
+  resetNorth(): void {
+    this.map?.getView().animate({ rotation: 0, duration: 300 });
   }
 
   zoomIn(): void {
