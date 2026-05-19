@@ -9,7 +9,7 @@ import {
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { SavedArea, AreaType } from './area';
+import { SavedArea, AreaType } from '../models/area';
 
 interface StoredArea {
   id: string;

@@ -1,112 +1,98 @@
 # Hektarix
 
-Hektarix is a modern web application for managing land parcels, forests, agricultural fields, and other mapped areas.
-
-The application allows users to draw, edit, organize, and manage property boundaries directly on an interactive map. Different area types such as forests, fields, and other land categories are visually distinguished and automatically calculated.
+Hektarix is a Progressive Web App (PWA) for managing land parcels on an interactive map. Users draw, edit, and organize property boundaries (forests, fields, etc.) with automatic area calculation. Data is stored in Firebase Firestore and synced in real time.
 
 ---
 
-# Features
+## Features
 
-## Interactive Map Management
-
-* Draw and edit land boundaries directly on the map
-* Rearrange and organize mapped areas
-* Interactive GIS-like workflow using Leaflet
-* Visual differentiation between forests, fields, and other area types
-
-## Automatic Area Calculation
-
-* Automatic calculation of area sizes in square meters (m²)
-* Live updates when polygons are edited
-* Clear display of total and individual area sizes
-
-## Modern Web Stack
-
-* Frontend built with Angular
-* Backend powered by Firebase
-* Real-time data synchronization
-* Cloud-hosted infrastructure
-
-## Area Types
-
-Hektarix supports different land categories including:
-
-* Forests
-* Agricultural fields
-* Grassland
-* Custom land areas
-
-Each area type is displayed with its own styling and color configuration.
+- Draw and edit land parcel boundaries directly on an interactive map
+- Select parcels from the Austrian cadastre (BEV Kataster) overlay
+- Visual differentiation between area types (forests, fields, grassland, etc.)
+- Automatic area size calculation in m² / ha
+- GPS location tracking during manual field recording
+- Real-time data sync via Firestore
+- Offline-capable PWA with service worker
 
 ---
 
-# Tech Stack
+## Tech Stack
 
-## Frontend
-
-* Angular
-* TypeScript
-* Leaflet
-* Angular Material
-
-## Backend
-
-* Firebase Authentication
-* Cloud Firestore
-* Firebase Hosting
-* Firebase Functions (optional)
+| Layer | Technology |
+|---|---|
+| Framework | Angular 21 (standalone components) |
+| Maps | OpenLayers 10 + ol-mapbox-style |
+| UI | Angular Material 21 |
+| Backend | Firebase (Auth, Firestore, Hosting) |
+| State | RxJS + Angular Signals |
+| Language | TypeScript 5.9 |
 
 ---
 
-# Installation
-
-## Prerequisites
-
-Make sure the following tools are installed:
-
-* Node.js
-* Angular CLI
-* Firebase CLI
+## Commands
 
 ```bash
-npm install -g @angular/cli
-npm install -g firebase-tools
+npm start          # Dev server at http://localhost:4200
+npm run build      # Development build
+npm run build:prod # Production build (optimized)
+npm run deploy     # Production build + Firebase Hosting deploy
 ```
 
 ---
 
-# Setup
+## Project Structure
 
-Clone the repository:
+```
+src/app/
+├── app.config.ts          # App bootstrap & Firebase providers
+├── app.routes.ts          # Route definitions
+├── app.ts                 # Root component
+│
+├── components/
+│   ├── area-edit-dialog/  # Dialog for editing area name/type
+│   ├── confirm-dialog/    # Generic confirmation dialog
+│   ├── list/              # Tabular area browser page
+│   ├── login/             # Google OAuth login page
+│   ├── map/               # Reusable OpenLayers map component
+│   ├── overview/          # Main map + area list page
+│   └── record/            # GPS recording / cadastre selection page
+│
+├── guards/
+│   └── auth.guard.ts      # Protects all routes except /login
+│
+├── models/
+│   └── area.ts            # SavedArea model + area type definitions
+│
+└── services/
+    ├── area.service.ts    # Firestore CRUD for areas
+    ├── auth.service.ts    # Firebase Google OAuth + email whitelist
+    └── geolocation.service.ts  # Browser Geolocation API wrapper
+```
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Node.js 20+
+- Angular CLI: `npm install -g @angular/cli`
+- Firebase CLI: `npm install -g firebase-tools`
+
+### Install
 
 ```bash
 git clone <repository-url>
 cd hektarix
-```
-
-Install dependencies:
-
-```bash
 npm install
 ```
 
-Configure Firebase:
+### Firebase configuration
 
-```bash
-firebase login
-firebase init
-```
-
-Add your Firebase configuration to:
-
-```bash
-src/environments/environment.ts
-```
-
-Example:
+Add your Firebase project config to `src/environments/`:
 
 ```ts
+// src/environments/environment.ts
 export const environment = {
   production: false,
   firebase: {
@@ -122,87 +108,22 @@ export const environment = {
 
 ---
 
-# Development Server
+## Map Layers
 
-Run the Angular development server:
+The map component supports configurable base layers and overlays with per-layer opacity/width sliders:
 
-```bash
-ng serve
-```
+**Base layers**
+- Kataster (BEV) — Austrian cadastre via Mapbox GL style
 
-Open your browser at:
-
-```text
-http://localhost:4200
-```
-
----
-
-# Build
-
-Create a production build:
-
-```bash
-ng build
-```
+**Overlays**
+- Straße (OpenStreetMap)
+- Satellit (ESRI World Imagery)
+- Topografie (OpenTopoMap)
+- Kataster Umrisse — vector tile parcel outlines (BEV)
+- Orthofoto (BEV) — aerial imagery from BEV
 
 ---
 
-# Firebase Deployment
+## Author
 
-Deploy the application:
-
-```bash
-firebase deploy
-```
-
----
-
-# Leaflet Integration
-
-Hektarix uses Leaflet for rendering and editing geographic data.
-
-Main features include:
-
-* Polygon drawing
-* Polygon editing
-* Area calculations
-* Layer styling
-* Dynamic rendering of land types
-
----
-
-# Project Structure
-
-```text
-src/
- ├── app/
- │    ├── components/
- │    ├── services/
- │    ├── models/
- │    ├── pages/
- │    └── shared/
- │
- ├── assets/
- ├── environments/
- └── styles/
-```
-
----
-
-# Future Ideas
-
-* Satellite map integration
-* Export to GeoJSON
-* PDF reports
-* Multi-user collaboration
-* GPS field tracking
-* Mobile optimization
-* Offline support
-* Statistics dashboard
-
----
-
-# Author
-
-Developed with ❤️ using Angular, Firebase, and Leaflet.
+Developed with Angular, Firebase, and OpenLayers.

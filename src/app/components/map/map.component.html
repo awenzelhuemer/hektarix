@@ -20,10 +20,17 @@
       @if (overlayNames.length) {
         <div class="layer-group-title">Ebenen</div>
         @for (name of overlayNames; track name) {
-          <label class="layer-item">
-            <input type="checkbox" [checked]="isOverlayActive(name)" (change)="toggleOverlay(name)">
-            <span>{{ name }}</span>
-          </label>
+          <div class="layer-item-group">
+            <label class="layer-item">
+              <input type="checkbox" [checked]="isOverlayActive(name)" (change)="toggleOverlay(name)">
+              <span>{{ name }}</span>
+            </label>
+            @if (isOverlayActive(name)) {
+              <input type="range" class="opacity-slider" min="0" max="1" step="0.05"
+                [value]="overlayOpacity(name)"
+                (input)="setOverlayOpacity(name, +$any($event.target).value)">
+            }
+          </div>
         }
       }
     </div>

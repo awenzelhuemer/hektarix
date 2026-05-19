@@ -6,7 +6,7 @@ import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { AREA_TYPES, AreaType, SavedArea } from '../shared/area';
+import { AREA_TYPES, AreaType, SavedArea } from '../../models/area';
 
 @Component({
   selector: 'app-area-edit-dialog',

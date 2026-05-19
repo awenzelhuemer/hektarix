@@ -5,10 +5,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDivider } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { AREA_TYPES, AreaType, SavedArea } from '../../shared/area';
-import { AreaService } from '../../shared/area.service';
-import { AreaEditDialogComponent } from './../../dialogs/area-edit-dialog';
-import { ConfirmDialogComponent } from './../../dialogs/confirm-dialog';
+import { AREA_TYPES, AreaType, SavedArea } from '../../models/area';
+import { AreaService } from '../../services/area.service';
+import { AreaEditDialogComponent } from '../../components/area-edit-dialog/area-edit-dialog';
+import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
 
 type SortField = 'name' | 'area';
 type SortDir = 'asc' | 'desc';

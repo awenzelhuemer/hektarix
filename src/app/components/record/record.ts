@@ -15,10 +15,10 @@ import Point from 'ol/geom/Point';
 import Polygon from 'ol/geom/Polygon';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
-import { MapComponent, OlMapOptions } from '../../shared/map/map.component';
-import { AREA_TYPES, AreaType } from '../../shared/area';
-import { GeolocationService } from '../../shared/geolocation.service';
-import { AreaService } from '../../shared/area.service';
+import { MapComponent, OlMapOptions } from '../../components/map/map.component';
+import { AREA_TYPES, AreaType } from '../../models/area';
+import { GeolocationService } from '../../services/geolocation.service';
+import { AreaService } from '../../services/area.service';
 
 type RecordState = 'idle' | 'recording' | 'kataster' | 'completing';
 

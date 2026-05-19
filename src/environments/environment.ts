@@ -4,7 +4,7 @@ export const environment = {
     'e.huber1001@gmail.com'
   ],
   firebase: {
-    apiKey: 'AIzaSyC6-e0dtWX2Cd5yRxDP1iO7uUcKBv8tOCw',
+    apiKey: '',
     authDomain: "hektarix.firebaseapp.com",
     projectId: "hektarix",
     storageBucket: "hektarix.firebasestorage.app",

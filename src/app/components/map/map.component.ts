@@ -15,9 +15,9 @@ import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
-
 import BaseLayer from 'ol/layer/Base';
-import { GeolocationService } from '../geolocation.service';
+import { MapboxVectorLayer } from 'ol-mapbox-style';
+import { GeolocationService } from '../../services/geolocation.service';
 
 export interface OlMapOptions {
   zoom?: number;
@@ -26,25 +26,17 @@ export interface OlMapOptions {
 
 const LAYER_KEY = 'hektarix-layer';
 const OVERLAY_KEY = 'hektarix-overlays';
+const OPACITY_KEY_PREFIX = 'hektarix-opacity-';
 const VIEW_KEY = 'hektarix-view';
 
 interface SavedView { lon: number; lat: number; zoom: number; }
 
 function buildDefaultBaseLayers(): Record<string, BaseLayer> {
   return {
-    'Straße': new TileLayer({ source: new OSM() }),
-    'Satellit': new TileLayer({
-      source: new XYZ({ url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', maxZoom: 19 }),
-    }),
-    'Topografie': new TileLayer({
-      source: new XYZ({ url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png', maxZoom: 17 }),
-    }),
-    'Orthofoto (BEV)': new TileLayer({
-      source: new XYZ({
-        url: 'https://kataster.bev.gv.at/ortho/gwc/service/wmts?service=WMTS&Version=1.1.1&Request=GetTile&Layer=inspire:AT_BEV_OI&Style=inspire:default&TileMatrixSet=EPSG:93857&Format=image/png&TileMatrix={z}&TileCol={x}&TileRow={y}',
-        maxZoom: 19,
-      }),
-    }),
+    'Kataster (BEV)': new MapboxVectorLayer({
+      styleUrl: 'https://kataster.bev.gv.at/styles/kataster/style_gis.json',
+      accessToken: '',
+    }) as unknown as BaseLayer,
   };
 }
 
@@ -56,12 +48,18 @@ const KATASTER_SOURCE = new VectorTileSource({
 
 function buildDefaultOverlays(): Record<string, BaseLayer> {
   return {
-    'Kataster (BEV)': new VectorTileLayer({
+    'Straße': new TileLayer({ source: new OSM() }),
+    'Satellit': new TileLayer({
+      source: new XYZ({ url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', maxZoom: 19 }),
+    }),
+    'Topografie': new TileLayer({
+      source: new XYZ({ url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png', maxZoom: 17 }),
+    }),
+    'Kataster Umrisse': new VectorTileLayer({
       source: KATASTER_SOURCE,
       minZoom: 14,
       style: new Style({
-        stroke: new Stroke({ color: 'black', width: 1 }),
-        fill: new Fill({ color: 'rgba(0,0,0,0)' }),
+        stroke: new Stroke({ color: '#ff6b00', width: 1.5 }),
       }),
     }),
   };
@@ -99,6 +97,7 @@ export class MapComponent implements OnInit, OnDestroy {
   private lastPosition?: [number, number];
   private watchId?: number;
   private readonly highlightedIds: (string | number)[] = [];
+  private katasterUmrisseWidth = 1.5;
 
   private readonly geo = inject(GeolocationService);
 
@@ -112,7 +111,7 @@ export class MapComponent implements OnInit, OnDestroy {
     const savedOverlaysRaw = localStorage.getItem(OVERLAY_KEY);
     const activeOverlays: string[] = savedOverlaysRaw
       ? JSON.parse(savedOverlaysRaw)
-      : this.overlayNames;
+      : ['Kataster Umrisse'];
 
     const [lat, lon] = this.mapOptions.center ?? [48.31, 14.29];
     const zoom = this.mapOptions.zoom ?? 15;
@@ -128,6 +127,15 @@ export class MapComponent implements OnInit, OnDestroy {
     const overlayLayers = this.overlayNames.map((name) => {
       const layer = this.overlays[name];
       layer.setVisible(activeOverlays.includes(name));
+      const savedOpacity = localStorage.getItem(OPACITY_KEY_PREFIX + name);
+      if (savedOpacity !== null) {
+        if (name === 'Kataster Umrisse') {
+          this.katasterUmrisseWidth = parseFloat(savedOpacity) * 3;
+          (layer as VectorTileLayer).setStyle(new Style({ stroke: new Stroke({ color: '#ff6b00', width: this.katasterUmrisseWidth }) }));
+        } else {
+          layer.setOpacity(parseFloat(savedOpacity));
+        }
+      }
       return layer;
     });
 
@@ -177,6 +185,23 @@ export class MapComponent implements OnInit, OnDestroy {
     localStorage.setItem(OVERLAY_KEY, JSON.stringify(active));
   }
 
+  overlayOpacity(name: string): number {
+    if (name === 'Kataster Umrisse') return this.katasterUmrisseWidth / 3;
+    return this.overlays[name]?.getOpacity() ?? 1;
+  }
+
+  setOverlayOpacity(name: string, value: number): void {
+    const layer = this.overlays[name];
+    if (!layer) return;
+    if (name === 'Kataster Umrisse') {
+      this.katasterUmrisseWidth = value * 3;
+      (layer as VectorTileLayer).setStyle(new Style({ stroke: new Stroke({ color: '#ff6b00', width: this.katasterUmrisseWidth }) }));
+    } else {
+      layer.setOpacity(value);
+    }
+    localStorage.setItem(OPACITY_KEY_PREFIX + name, String(value));
+  }
+
   resetNorth(): void {
     this.map?.getView().animate({ rotation: 0, duration: 300 });
   }
@@ -210,7 +235,7 @@ export class MapComponent implements OnInit, OnDestroy {
       fill: new Fill({ color: 'rgba(255, 107, 0, 0.15)' }),
     });
 
-    const katasterLayer = this.overlays['Kataster (BEV)'] as VectorTileLayer;
+    const katasterLayer = this.baseLayers['Kataster (BEV)'] as VectorTileLayer;
 
     const highlightLayer = new VectorTileLayer({
       source: KATASTER_SOURCE,
@@ -224,15 +249,12 @@ export class MapComponent implements OnInit, OnDestroy {
 
     this.map.addLayer(highlightLayer);
 
-    const pickSmallest = (pixel: number[]) => {
-      if (!katasterLayer?.getVisible()) return null;
-      const features = this.map!.getFeaturesAtPixel(pixel, {
+    const getParcelFeatures = (pixel: number[]) => {
+      if (!katasterLayer?.getVisible()) return [];
+
+      return this.map!.getFeaturesAtPixel(pixel, {
         layerFilter: (l) => l === katasterLayer,
-      });
-      return features.slice().sort((a, b) => {
-        const area = (f: typeof a) => { const e = f.getGeometry()?.getExtent() ?? [0,0,0,0]; return (e[2]-e[0])*(e[3]-e[1]); };
-        return area(a) - area(b);
-      })[0] ?? null;
+      }).filter((f) => f.get('ns') != null);
     };
 
     this.map.on('pointermove', (e) => {
@@ -241,16 +263,16 @@ export class MapComponent implements OnInit, OnDestroy {
         this.mapEl.nativeElement.style.cursor = '';
         return;
       }
-      const feature = pickSmallest(e.pixel);
+      const features = getParcelFeatures(e.pixel);
       this.highlightedIds.length = 0;
-      if (feature) this.highlightedIds.push(feature.getId() as string | number);
+      this.highlightedIds.push(...features.map(f => f.getId() as string | number).filter(id => id != null));
       highlightLayer.changed();
-      this.mapEl.nativeElement.style.cursor = feature ? 'pointer' : '';
+      this.mapEl.nativeElement.style.cursor = features.length ? 'pointer' : '';
     });
 
     this.map.on('click', (e) => {
       if (!this.katasterSelectionEnabled) return;
-      const feature = pickSmallest(e.pixel);
+      const feature = getParcelFeatures(e.pixel)[0];
       if (!feature) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const f = feature as any;

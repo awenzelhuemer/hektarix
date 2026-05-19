@@ -15,9 +15,9 @@ import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 import { Modify } from 'ol/interaction';
 import { doubleClick } from 'ol/events/condition';
 import { getArea } from 'ol/sphere';
-import { MapComponent, OlMapOptions } from '../../shared/map/map.component';
-import { AREA_TYPES, AreaType, SavedArea } from '../../shared/area';
-import { AreaService } from '../../shared/area.service';
+import { MapComponent, OlMapOptions } from '../../components/map/map.component';
+import { AREA_TYPES, AreaType, SavedArea } from '../../models/area';
+import { AreaService } from '../../services/area.service';
 
 @Component({
   selector: 'app-overview',

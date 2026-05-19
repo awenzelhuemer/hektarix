@@ -84,6 +84,19 @@
   }
 }
 
+.layer-item-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opacity-slider {
+  width: 100%;
+  accent-color: #2d6a4f;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
 .map-fab {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }

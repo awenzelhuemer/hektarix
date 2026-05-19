@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SwUpdate, VersionDetectedEvent, VersionInstallationFailedEvent, VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs';
-import { AuthService } from './shared/auth.service';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
