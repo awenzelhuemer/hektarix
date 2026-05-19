@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - name: Inject Firebase secrets
         run: |
-          sed -i "s|apiKey: null|apiKey: '${{ secrets.FIREBASE_API_KEY }}'|" src/environments/environment.ts
+          sed -i "s|apiKey: ''|apiKey: '${{ secrets.FIREBASE_API_KEY }}'|" src/environments/environment.ts
       - run: npm run build:prod
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
